@@ -9,4 +9,4 @@ Site React statique type livescore avec structure proche de Flashscore:
 - favoris locaux sans compte client;
 - actualites affichees dans le site, sans lien externe.
 
-Le site utilise React en modules ESM, sans build obligatoire, pour rester deployable directement sur GitHub Pages.
+Le site utilise React en modules ESM, sans build obligatoire.

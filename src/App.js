@@ -9,7 +9,6 @@ const SPORTS = [
   {
     id: "football",
     label: "Football",
-    icon: "FOOT",
     newsPath: "soccer/eng.1",
     leagues: [
       league("fifa.world", "Coupe du monde", "Monde", "un", "soccer/fifa.world", true),
@@ -29,7 +28,6 @@ const SPORTS = [
   {
     id: "basketball",
     label: "Basket",
-    icon: "BASK",
     newsPath: "basketball/nba",
     leagues: [
       league("nba", "NBA", "USA", "us", "basketball/nba", true),
@@ -41,7 +39,6 @@ const SPORTS = [
   {
     id: "american-football",
     label: "Football Am.",
-    icon: "NFL",
     newsPath: "football/nfl",
     leagues: [
       league("nfl", "NFL", "USA", "us", "football/nfl", true),
@@ -51,7 +48,6 @@ const SPORTS = [
   {
     id: "baseball",
     label: "Baseball",
-    icon: "MLB",
     newsPath: "baseball/mlb",
     leagues: [
       league("mlb", "MLB", "USA", "us", "baseball/mlb", true),
@@ -61,7 +57,6 @@ const SPORTS = [
   {
     id: "hockey",
     label: "Hockey",
-    icon: "NHL",
     newsPath: "hockey/nhl",
     leagues: [league("nhl", "NHL", "Canada/USA", "ca", "hockey/nhl", true)],
   },
@@ -292,7 +287,7 @@ function App() {
           <${RightPanel} sport=${sport} news=${news} matches=${matches} openNews=${(item) => navigate("article", item.id)} navigate=${navigate} selectSearch=${selectSearch} />
         </main>
       `}
-      <${Footer} navigate=${navigate} />
+      <${Footer} navigate=${navigate} sport=${sport} matches=${matches} news=${news} />
       ${selectedMatch && html`<${MatchModal} match=${selectedMatch} onClose=${() => setSelectedMatch(null)} />`}
     </div>
   `;
@@ -340,8 +335,16 @@ function HeroBanner({ sport, matches, navigate }) {
 
 function SportsBar({ sportId, setSportId }) {
   return html`<nav className="sports-bar" aria-label="Sports">
-    ${SPORTS.map((sport) => html`<button key=${sport.id} className=${`sport-btn liquid-button ${sport.id === sportId ? "active" : ""}`} onClick=${() => setSportId(sport.id)}><span>${sport.icon}</span>${sport.label}</button>`)}
+    ${SPORTS.map((sport) => html`<button key=${sport.id} className=${`sport-btn liquid-button ${sport.id === sportId ? "active" : ""}`} onClick=${() => setSportId(sport.id)}><span className="sport-icon-wrap"><${SportIcon} id=${sport.id} /></span>${sport.label}</button>`)}
   </nav>`;
+}
+
+function SportIcon({ id }) {
+  if (id === "basketball") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.8 12h16.4M12 3.5v17M5.8 6.2c3 2.4 4.6 5.9 4.7 10.8M18.2 6.2c-3 2.4-4.6 5.9-4.7 10.8" /></svg>`;
+  if (id === "american-football") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15.5C7.8 20.2 16.2 20.2 20 8.5C16.2 3.8 7.8 3.8 4 15.5Z" /><path d="M8 15.5 16 8.5M10 12l3 3M12 10l3 3" /></svg>`;
+  if (id === "baseball") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M7 5.4c2.3 3.1 2.3 10.1 0 13.2M17 5.4c-2.3 3.1-2.3 10.1 0 13.2M7.7 8.2l1.7.9M7.5 11l1.9.4M7.6 13.8l1.8-.5M16.3 8.2l-1.7.9M16.5 11l-1.9.4M16.4 13.8l-1.8-.5" /></svg>`;
+  if (id === "hockey") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v10.5c0 2.5 1.7 3.5 4 3.5h5.5c1.8 0 3-1 3-2.4 0-1.2-1-2.1-2.5-2.1h-4" /><path d="M12 18h-8M3 20h6" /></svg>`;
+  return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.4 15.9 10l-1.5 4.5H9.6L8.1 10 12 7.4ZM12 3.5v3.9M4.5 9.2 8.1 10M6.2 18.2l3.4-3.7M17.8 18.2l-3.4-3.7M19.5 9.2 15.9 10" /></svg>`;
 }
 
 function LeftPanel({ sport, matches, favorites, openMatch, selectSearch }) {
@@ -394,7 +397,10 @@ function TeamCell({ team, side = "" }) {
 }
 
 function RightPanel({ sport, news, matches, openNews, navigate, selectSearch }) {
-  return html`<aside className="right-panel"><section className="panel news-panel"><div className="panel-heading-row"><h2>Actualites</h2><button className="panel-link" onClick=${() => navigate("news")}>Tout voir</button></div><div className="news-list">${news.slice(0, 5).map((item) => html`<button className="news-card" onClick=${() => openNews(item)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="team-logo"></div>`}<span><strong>${item.title}</strong><small>${item.description || "Lire dans Foot Live"}</small></span></button>`)}</div></section><section className="panel"><h2>Top competitions</h2><div className="stack">${sport.leagues.slice(0, 8).map((item) => html`<button className="top-row" onClick=${() => selectSearch(item.label)}><span className="top-main"><${Flag} code=${item.flag} /><strong>${item.label}</strong></span><span className="count-pill">${countForLeague(matches, item.id)}</span></button>`)}</div></section></aside>`;
+  const live = matches.filter((match) => match.state === "in").length;
+  const finished = matches.filter((match) => match.state === "post").length;
+  const scheduled = matches.filter((match) => match.state !== "in" && match.state !== "post").length;
+  return html`<aside className="right-panel"><section className="panel news-panel"><div className="panel-heading-row"><h2>Actualites</h2><button className="panel-link" onClick=${() => navigate("news")}>Tout voir</button></div><div className="news-list">${news.slice(0, 5).map((item) => html`<button className="news-card" onClick=${() => openNews(item)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="team-logo"></div>`}<span><strong>${item.title}</strong><small>${item.description || "Lire dans Foot Live"}</small></span></button>`)}</div></section><section className="panel data-panel"><h2>Infos du jour</h2><div className="data-grid"><div><strong>${matches.length}</strong><span>matchs charges</span></div><div><strong>${live}</strong><span>live</span></div><div><strong>${finished}</strong><span>termines</span></div><div><strong>${scheduled}</strong><span>a venir</span></div></div></section><section className="panel"><h2>Top competitions</h2><div className="stack">${sport.leagues.slice(0, 8).map((item) => html`<button className="top-row" onClick=${() => selectSearch(item.label)}><span className="top-main"><${Flag} code=${item.flag} /><strong>${item.label}</strong></span><span className="count-pill">${countForLeague(matches, item.id)}</span></button>`)}</div></section></aside>`;
 }
 
 function NewsPage({ sport, news, navigate }) {
@@ -413,8 +419,29 @@ function MatchModal({ match, onClose }) {
   return html`<div className="modal-backdrop"><div className="dialog dialog-open"><div className="dialog-card"><div className="dialog-top"><div><p className="eyebrow">${match.competition.country}: ${match.competition.label}</p><h2>${match.away.name} - ${match.home.name}</h2></div><button className="close-dialog" onClick=${onClose}>x</button></div><div className="dialog-score"><div className="dialog-team"><${TeamCell} team=${match.away} /><span>${match.away.name}</span></div><div className="dialog-total">${match.away.score} - ${match.home.score}</div><div className="dialog-team"><${TeamCell} team=${match.home} /><span>${match.home.name}</span></div></div><p><strong>Statut:</strong> ${match.status}</p><p><strong>Source:</strong> ${match.source}</p><p><strong>Lieu:</strong> ${match.venue || "Non renseigne"}</p></div></div></div>`;
 }
 
-function Footer({ navigate }) {
-  return html`<footer className="site-footer"><div><strong>Foot Live</strong><p>Livescore React, actus internes, drapeaux reels et interface ordonnee pour GitHub Pages.</p></div><nav><button onClick=${() => navigate("scores")}>Resultats</button><button onClick=${() => navigate("news")}>Actualites</button><button onClick=${() => navigate("favorites")}>Favoris</button></nav><span>ESPN data / FlagCDN flags / React UI</span></footer>`;
+function Footer({ navigate, sport, matches, news }) {
+  const live = matches.filter((match) => match.state === "in").length;
+  const competitions = new Set(matches.map((match) => match.competition.label)).size;
+  return html`
+    <footer className="site-footer">
+      <div className="footer-brand">
+        <span className="brand-mark">FL</span>
+        <div><strong>Foot Live</strong><p>Scores en direct, Coupe du monde 2026, actualites integrees et drapeaux reels.</p></div>
+      </div>
+      <div className="footer-stats">
+        <div><strong>${matches.length}</strong><span>matchs</span></div>
+        <div><strong>${live}</strong><span>live</span></div>
+        <div><strong>${competitions}</strong><span>competitions</span></div>
+        <div><strong>${news.length}</strong><span>actus</span></div>
+      </div>
+      <div className="footer-columns">
+        <section><h3>Navigation</h3><button onClick=${() => navigate("scores")}>Resultats</button><button onClick=${() => navigate("news")}>Actualites</button><button onClick=${() => navigate("favorites")}>Favoris</button></section>
+        <section><h3>Sports</h3>${SPORTS.map((item) => html`<button onClick=${() => navigate("scores")}><${SportIcon} id=${item.id} />${item.label}</button>`)}</section>
+        <section><h3>${sport.label}</h3>${sport.leagues.slice(0, 5).map((item) => html`<button onClick=${() => navigate("scores")}><${Flag} code=${item.flag} />${item.label}</button>`)}</section>
+        <section><h3>Donnees</h3><p>Flux scores et actualites ESPN, drapeaux FlagCDN, favoris stockes localement sans compte client.</p></section>
+      </div>
+    </footer>
+  `;
 }
 
 function countForLeague(matches, id) {
@@ -432,8 +459,8 @@ function groupByCompetition(matches) {
 
 function fallbackNews(sport) {
   return [
-    { id: "local-news-1", title: `${sport.label}: centre de scores charge dans Foot Live`, description: "Les articles restent dans le site, sans lien externe.", body: "Cette actualite locale remplace ESPN si le flux news ne repond pas." },
-    { id: "local-news-2", title: "Coupe du monde, ligues et scores par sport", description: "Chaque sport utilise son propre ensemble de competitions.", body: "Football, basket, football americain, baseball et hockey sont separes." },
+    { id: "status-news-1", title: `Flux actualites ${sport.label} temporairement indisponible`, description: "Le site garde les scores actifs et recharge les articles ESPN des que le flux repond.", body: "Aucune actualite inventee: ce message indique seulement que le flux ESPN n'a pas repondu au moment du chargement." },
+    { id: "status-news-2", title: "Scores, drapeaux et competitions restent disponibles", description: "Les tableaux de matchs continuent d'utiliser les endpoints sportifs configures par discipline.", body: "Les informations affichees dans les scores proviennent des flux de calendrier et de scoreboard, avec les competitions separees par sport." },
   ];
 }
 

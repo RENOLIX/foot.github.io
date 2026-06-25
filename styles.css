@@ -240,10 +240,14 @@ button {
   padding: 22px;
   border-radius: 8px;
   background:
-    linear-gradient(120deg, rgba(11, 23, 20, 0.92), rgba(16, 46, 38, 0.94)),
+    linear-gradient(110deg, rgba(7, 16, 14, 0.92) 0%, rgba(10, 30, 25, 0.84) 48%, rgba(7, 16, 14, 0.5) 100%),
+    url("public/assets/hero-stadium.png"),
     var(--dark);
+  background-position: center;
+  background-size: cover;
   color: #ffffff;
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 .hero-copy h1 {
@@ -286,15 +290,27 @@ button {
   overflow-x: auto;
 }
 
-.sport-btn span {
+.sport-icon-wrap {
   display: inline-grid;
   place-items: center;
-  min-width: 34px;
-  height: 22px;
-  padding: 0 6px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
   background: rgba(11, 23, 20, 0.07);
-  font-size: 10px;
+}
+
+.sport-btn.active .sport-icon-wrap {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.sport-icon {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .page-grid {
@@ -821,34 +837,128 @@ h1 {
   font-weight: 900;
 }
 
-.site-footer {
+.data-grid {
   display: grid;
-  grid-template-columns: 1.2fr auto auto;
-  gap: 18px;
-  align-items: center;
-  margin-top: 10px;
-  padding: 18px;
-  color: #eafff7;
-  border-color: var(--line-dark);
-  background: linear-gradient(135deg, var(--dark), #172822);
-}
-
-.site-footer p {
-  margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.66);
-}
-
-.site-footer nav {
-  display: flex;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.site-footer button {
-  min-height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+.data-grid div {
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid var(--line);
   border-radius: 8px;
+  background: var(--panel);
+}
+
+.data-grid strong {
+  font-size: 24px;
+}
+
+.data-grid span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.site-footer {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(220px, 0.8fr) minmax(0, 1.8fr);
+  gap: 22px;
+  align-items: start;
+  margin-top: 12px;
+  padding: 24px;
+  color: #eafff7;
+  border-color: var(--line-dark);
+  background:
+    linear-gradient(135deg, rgba(11, 23, 20, 0.98), rgba(15, 47, 39, 0.96)),
+    var(--dark);
+}
+
+.footer-brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.footer-brand .brand-mark {
+  flex: 0 0 auto;
+}
+
+.site-footer p,
+.site-footer span {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.66);
+  line-height: 1.55;
+}
+
+.footer-stats,
+.footer-columns {
+  display: grid;
+  gap: 8px;
+}
+
+.footer-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.footer-stats div {
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.footer-stats strong {
+  display: block;
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+  font-size: 28px;
+}
+
+.footer-columns {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.footer-columns section {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.footer-columns h3 {
+  margin: 0 0 4px;
+  color: #ffffff;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.site-footer button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-width: 0 0 1px;
+  border-radius: 0;
+  color: #ffffff;
+  background: transparent;
+  text-align: left;
+}
+
+.site-footer .sport-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.site-footer .flag {
+  width: 18px;
+  min-width: 18px;
 }
 
 @media (max-width: 1120px) {
@@ -949,5 +1059,9 @@ h1 {
 
   .site-footer {
     grid-template-columns: 1fr;
+  }
+
+  .footer-columns {
+    grid-template-columns: 1fr 1fr;
   }
 }
