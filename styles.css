@@ -285,13 +285,16 @@ button {
 }
 
 .sports-bar {
+  width: 100%;
+  max-width: 100%;
   margin-top: 10px;
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 0;
   min-height: 48px;
   padding: 0;
-  overflow: visible;
+  overflow: hidden;
+  border: 1px solid #d9e1e5;
   border-radius: 0;
   background: #f2f5f7;
 }
@@ -302,6 +305,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 9px;
+  width: 100%;
   min-width: 0;
   min-height: 48px;
   padding: 0 11px;
@@ -351,7 +355,9 @@ button {
 
 .sport-btn span:last-child {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
 }
 
 .sport-icon {
@@ -1081,16 +1087,14 @@ h1 {
   }
 
   .sports-bar {
-    display: flex;
-    flex-wrap: wrap;
-    width: 100%;
-    max-width: 100%;
-    overflow: visible;
+    display: grid;
+    grid-template-columns: 1fr;
+    overflow: hidden;
   }
 
   .sport-btn {
-    flex: 0 0 50%;
-    max-width: 50%;
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
     min-height: 54px;
     flex-direction: column;
@@ -1099,7 +1103,13 @@ h1 {
     border-top: 1px solid rgba(213, 221, 226, 0.78);
     font-size: 10px;
     line-height: 1.1;
-    white-space: normal;
+    white-space: normal !important;
+  }
+
+  .sport-btn span:last-child {
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
   }
 
   .sport-btn::before {

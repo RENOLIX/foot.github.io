@@ -60,18 +60,63 @@ const SPORTS = [
     newsPath: "hockey/nhl",
     leagues: [league("nhl", "NHL", "Canada/USA", "ca", "hockey/nhl", true)],
   },
+  {
+    id: "tennis",
+    label: "Tennis",
+    newsPath: "tennis/atp",
+    leagues: [
+      league("atp", "ATP", "Monde", "un", "tennis/atp", true),
+      league("wta", "WTA", "Monde", "un", "tennis/wta", true),
+    ],
+  },
+  {
+    id: "rugby",
+    label: "Rugby",
+    newsPath: "rugby/league",
+    leagues: [
+      league("rugby-league", "Rugby League", "Monde", "un", "rugby/league", true),
+      league("rugby-union", "Rugby Union", "Monde", "un", "rugby/union", true),
+    ],
+  },
+  {
+    id: "handball",
+    label: "Handball",
+    newsPath: "handball/mens",
+    unavailable: "ESPN ne fournit pas de flux site public stable pour le handball sur cette API.",
+    leagues: [],
+  },
+  {
+    id: "volleyball",
+    label: "Volley",
+    newsPath: "volleyball/womens-college-volleyball",
+    leagues: [
+      league("womens-college-volleyball", "NCAA Volley Femmes", "USA", "us", "volleyball/womens-college-volleyball", true),
+      league("mens-college-volleyball", "NCAA Volley Hommes", "USA", "us", "volleyball/mens-college-volleyball", true),
+    ],
+  },
+  {
+    id: "other",
+    label: "Autres",
+    newsPath: "football/nfl",
+    leagues: [
+      league("nfl", "NFL", "USA", "us", "football/nfl", true),
+      league("mlb", "MLB", "USA", "us", "baseball/mlb", true),
+      league("college-football", "College Football", "USA", "us", "football/college-football"),
+      league("college-baseball", "College Baseball", "USA", "us", "baseball/college-baseball"),
+    ],
+  },
 ];
 
 const SPORT_NAV_ITEMS = [
   { id: "football", label: "Football", target: "football" },
-  { id: "world-cup", label: "Coupe du Monde", target: "football", query: "Coupe du monde" },
+  { id: "world-cup", label: "Coupe du Monde", target: "football", query: "Championnat du Monde" },
   { id: "basketball", label: "Basket", target: "basketball" },
-  { id: "tennis", label: "Tennis", query: "Tennis" },
-  { id: "rugby", label: "Rugby", query: "Rugby" },
-  { id: "handball", label: "Handball", query: "Handball" },
-  { id: "volleyball", label: "Volley", query: "Volley" },
+  { id: "tennis", label: "Tennis", target: "tennis" },
+  { id: "rugby", label: "Rugby", target: "rugby" },
+  { id: "handball", label: "Handball", target: "handball" },
+  { id: "volleyball", label: "Volley", target: "volleyball" },
   { id: "hockey", label: "Hockey", target: "hockey" },
-  { id: "more", label: "Autres", query: "" },
+  { id: "more", label: "Autres", target: "other" },
 ];
 
 const WORLD_CUP_FIXTURES = [
@@ -134,6 +179,10 @@ function espnDate(date) {
   return date.split("-").join("");
 }
 
+function todayInAlgiers() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Algiers" }).format(new Date());
+}
+
 function scoreboardUrl(item, date) {
   return `${ESPN_BASE}/${item.path}/scoreboard?dates=${espnDate(date)}`;
 }
@@ -183,21 +232,29 @@ function normalizeNews(payload) {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 9000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 function App() {
   const [route, setRoute] = useState(() => readRoute());
   const [sportId, setSportId] = useState("football");
-  const [date, setDate] = useState("2026-06-25");
+  const [navId, setNavId] = useState("football");
+  const [date, setDate] = useState(() => todayInAlgiers());
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [matches, setMatches] = useState([]);
   const [news, setNews] = useState([]);
   const [loadingLabel, setLoadingLabel] = useState("Chargement des matches ESPN...");
+  const [lastUpdated, setLastUpdated] = useState("");
   const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem("footlive:favorites") || "[]"));
   const [selectedMatch, setSelectedMatch] = useState(null);
   const sport = SPORTS.find((item) => item.id === sportId) || SPORTS[0];
@@ -218,6 +275,15 @@ function App() {
     async function load() {
       setLoadingLabel("Chargement des matches ESPN...");
       setMatches([]);
+      if (!sport.leagues.length) {
+        const nextNews = fallbackNews(sport);
+        if (!cancelled) {
+          setMatches([]);
+          setNews(nextNews);
+          setLoadingLabel(sport.unavailable || "Aucun flux ESPN configure pour ce sport.");
+        }
+        return;
+      }
       const settled = await Promise.allSettled(
         sport.leagues.map(async (item) => {
           const payload = await fetchJson(scoreboardUrl(item, date));
@@ -236,6 +302,7 @@ function App() {
         const failed = settled.filter((result) => result.status === "rejected").length;
         setMatches([...worldCup, ...espnMatches]);
         setNews(nextNews);
+        setLastUpdated(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
         setLoadingLabel(`${worldCup.length + espnMatches.length} match(s) affiches - ${sport.leagues.length - failed}/${sport.leagues.length} competitions ESPN chargees`);
       }
     }
@@ -244,6 +311,11 @@ function App() {
       cancelled = true;
     };
   }, [sportId, date, refreshKey]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setRefreshKey((value) => value + 1), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("footlive:favorites", JSON.stringify(favorites));
@@ -266,13 +338,15 @@ function App() {
   const favoriteMatches = matches.filter((match) => favorites.includes(match.id));
   const currentArticle = news.find((item) => item.id === route.id) || news[0] || fallbackNews(sport)[0];
   const toggleFavorite = (id) => setFavorites((items) => (items.includes(id) ? items.filter((item) => item !== id) : [...items, id]));
-  const changeSport = (id, nextQuery = "") => {
+  const changeSport = (id, nextQuery = "", nextNavId = id) => {
     setSportId(id);
+    setNavId(nextNavId);
     setFilter("all");
     setQuery(nextQuery);
     navigate("scores");
   };
   const selectSearch = (term) => {
+    setNavId("");
     setQuery(term);
     navigate("scores");
   };
@@ -282,7 +356,7 @@ function App() {
       <${TopAnnouncement} />
       <${Topbar} query=${query} setQuery=${setQuery} route=${route} navigate=${navigate} />
       <${HeroBanner} sport=${sport} matches=${matches} navigate=${navigate} />
-      <${SportsBar} sportId=${sportId} setSportId=${changeSport} selectSearch=${selectSearch} />
+      <${SportsBar} navId=${navId} setSportId=${changeSport} />
       ${route.view === "news" && html`<${NewsPage} sport=${sport} news=${news} navigate=${navigate} />`}
       ${route.view === "article" && html`<${ArticlePage} article=${currentArticle} sport=${sport} navigate=${navigate} />`}
       ${route.view === "favorites" && html`<${FavoritesPage} favorites=${favoriteMatches} navigate=${navigate} openMatch=${setSelectedMatch} />`}
@@ -293,7 +367,7 @@ function App() {
             <${ScoreToolbar} sport=${sport} date=${date} setDate=${setDate} />
             <${FilterTabs} filter=${filter} setFilter=${setFilter} />
             <${WorldCupStrip} sportId=${sportId} date=${date} />
-            <div className="status-line"><span>${loadingLabel}</span><button className="liquid-button dark" type="button" onClick=${() => setRefreshKey((value) => value + 1)}>Actualiser</button></div>
+            <div className="status-line"><span>${loadingLabel}${lastUpdated ? ` - MAJ ${lastUpdated}` : ""}</span><button className="liquid-button dark" type="button" onClick=${() => setRefreshKey((value) => value + 1)}>Actualiser</button></div>
             <${Scoreboard} matches=${visibleMatches} favorites=${favorites} toggleFavorite=${toggleFavorite} openMatch=${setSelectedMatch} />
           </section>
           <${RightPanel} sport=${sport} news=${news} matches=${matches} openNews=${(item) => navigate("article", item.id)} navigate=${navigate} selectSearch=${selectSearch} />
@@ -345,16 +419,12 @@ function HeroBanner({ sport, matches, navigate }) {
   `;
 }
 
-function SportsBar({ sportId, setSportId, selectSearch }) {
+function SportsBar({ navId, setSportId }) {
   const selectItem = (item) => {
-    if (item.target) {
-      setSportId(item.target, item.query || "");
-      return;
-    }
-    selectSearch(item.query || "");
+    setSportId(item.target, item.query || "", item.id);
   };
   return html`<nav className="sports-bar" aria-label="Sports">
-    ${SPORT_NAV_ITEMS.map((item) => html`<button key=${item.id} className=${`sport-btn ${item.target === sportId && !item.query ? "active" : ""} ${item.id === "world-cup" && sportId === "football" ? "world-cup-btn" : ""}`} onClick=${() => selectItem(item)}><span className="sport-icon-wrap"><${SportIcon} id=${item.id} /></span><span>${item.label}</span></button>`)}
+    ${SPORT_NAV_ITEMS.map((item) => html`<button key=${item.id} className=${`sport-btn ${item.id === navId ? "active" : ""}`} onClick=${() => selectItem(item)} type="button"><span className="sport-icon-wrap"><${SportIcon} id=${item.id} /></span><span>${item.label}</span></button>`)}
   </nav>`;
 }
 
