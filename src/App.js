@@ -127,7 +127,7 @@ function readRoute() {
   const clean = window.location.hash.replace(/^#\/?/, "");
   const [view = "scores", ...rest] = clean.split("/");
   return {
-    view: ["scores", "news", "article", "favorites"].includes(view) ? view : "scores",
+    view: ["scores", "news", "article", "favorites", "match"].includes(view) ? view : "scores",
     id: decodeURIComponent(rest.join("/") || ""),
   };
 }
@@ -150,6 +150,10 @@ function todayInAlgiers() {
 
 function scoreboardUrl(item, date) {
   return `${ESPN_BASE}/${item.path}/scoreboard?dates=${espnDate(date)}`;
+}
+
+function summaryUrl(match) {
+  return `${ESPN_BASE}/${match.leaguePath}/summary?event=${match.eventId}`;
 }
 
 function previousDate(date) {
@@ -185,6 +189,8 @@ function normalizeEvent(event, item) {
   const statusType = event.status?.type || {};
   return {
     id: `${item.id}-${event.id}`,
+    eventId: event.id,
+    leaguePath: item.path,
     date: (event.date || "").slice(0, 10),
     status: statusType.shortDetail || statusType.detail || "A venir",
     state: statusType.state || "pre",
@@ -231,7 +237,6 @@ function App() {
   const [loadingLabel, setLoadingLabel] = useState("Chargement des matches ESPN...");
   const [lastUpdated, setLastUpdated] = useState("");
   const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem("footlive:favorites") || "[]"));
-  const [selectedMatch, setSelectedMatch] = useState(null);
   const sport = SPORTS.find((item) => item.id === sportId) || SPORTS[0];
 
   const navigate = (view, id = "") => {
@@ -302,6 +307,7 @@ function App() {
       const queryOk = !q || haystack.includes(q);
       const filterOk =
         filter === "all" ||
+        filter === "odds" ||
         (filter === "live" && match.state === "in") ||
         (filter === "finished" && match.state === "post") ||
         (filter === "scheduled" && match.state !== "post" && match.state !== "in");
@@ -311,6 +317,8 @@ function App() {
 
   const favoriteMatches = matches.filter((match) => favorites.includes(match.id));
   const currentArticle = news.find((item) => item.id === route.id) || news[0] || null;
+  const currentMatch = matches.find((match) => match.id === route.id) || null;
+  const openMatchPage = (match) => navigate("match", match.id);
   const toggleFavorite = (id) => setFavorites((items) => (items.includes(id) ? items.filter((item) => item !== id) : [...items, id]));
   const changeSport = (id, nextQuery = "", nextNavId = id) => {
     setSportId(id);
@@ -333,28 +341,26 @@ function App() {
       <${SportsBar} navId=${navId} setSportId=${changeSport} />
       ${route.view === "news" && html`<${NewsPage} sport=${sport} news=${news} navigate=${navigate} />`}
       ${route.view === "article" && html`<${ArticlePage} article=${currentArticle} sport=${sport} navigate=${navigate} />`}
-      ${route.view === "favorites" && html`<${FavoritesPage} favorites=${favoriteMatches} navigate=${navigate} openMatch=${setSelectedMatch} />`}
+      ${route.view === "match" && html`<${MatchPage} match=${currentMatch} navigate=${navigate} />`}
+      ${route.view === "favorites" && html`<${FavoritesPage} favorites=${favoriteMatches} navigate=${navigate} openMatch=${openMatchPage} />`}
       ${route.view === "scores" && html`
         <main className="page-grid">
-          <${LeftPanel} sport=${sport} matches=${matches} favorites=${favoriteMatches} openMatch=${setSelectedMatch} selectSearch=${selectSearch} />
+          <${LeftPanel} sport=${sport} matches=${matches} favorites=${favoriteMatches} openMatch=${openMatchPage} selectSearch=${selectSearch} />
           <section className="center-panel">
-            <${ScoreToolbar} sport=${sport} date=${date} setDate=${setDate} />
-            <${FilterTabs} filter=${filter} setFilter=${setFilter} />
-            <${WorldCupStrip} sportId=${sportId} matches=${matches} />
+            <${ScoreHeader} filter=${filter} setFilter=${setFilter} date=${date} setDate=${setDate} />
             <div className="status-line"><span>${loadingLabel}${lastUpdated ? ` - MAJ ${lastUpdated}` : ""}</span><button className="liquid-button dark" type="button" onClick=${() => setRefreshKey((value) => value + 1)}>Actualiser</button></div>
-            <${Scoreboard} matches=${visibleMatches} favorites=${favorites} toggleFavorite=${toggleFavorite} openMatch=${setSelectedMatch} />
+            <${Scoreboard} matches=${visibleMatches} favorites=${favorites} toggleFavorite=${toggleFavorite} openMatch=${openMatchPage} />
           </section>
           <${RightPanel} sport=${sport} news=${news} matches=${matches} openNews=${(item) => navigate("article", item.id)} navigate=${navigate} selectSearch=${selectSearch} />
         </main>
       `}
       <${Footer} navigate=${navigate} sport=${sport} matches=${matches} news=${news} />
-      ${selectedMatch && html`<${MatchModal} match=${selectedMatch} onClose=${() => setSelectedMatch(null)} />`}
     </div>
   `;
 }
 
 function TopAnnouncement() {
-  return html`<div className="announcement"><strong>Foot Live Pro</strong><span>Scores multi-sports, Coupe du monde 2026, actualites internes et interface sans compte client.</span></div>`;
+  return html`<div className="announcement"><strong>Foot Live Pro</strong><span>Scores multi-sports ESPN, actualites internes et interface sans compte client.</span></div>`;
 }
 
 function Topbar({ query, setQuery, route, navigate }) {
@@ -431,33 +437,62 @@ function LeagueButton({ league, count, onClick }) {
   return html`<button className="league-link" onClick=${onClick}><span className="league-main"><${Flag} code=${league.flag} /><span><strong>${league.label}</strong><br /><small>${league.country}</small></span></span><span className="count-pill">${count}</span></button>`;
 }
 
-function ScoreToolbar({ sport, date, setDate }) {
+function ScoreHeader({ filter, setFilter, date, setDate }) {
   const shiftDate = (days) => {
     const current = new Date(`${date}T00:00:00`);
     current.setDate(current.getDate() + days);
     setDate(current.toISOString().slice(0, 10));
   };
-  return html`<div className="score-toolbar"><div><p className="eyebrow">${sport.label}</p><h1>${sport.id === "football" ? "Resultats foot en direct" : `${sport.label} en direct`}</h1></div><div className="date-controls"><button className="liquid-button" onClick=${() => shiftDate(-1)} type="button">Prev</button><input value=${date} onChange=${(event) => setDate(event.target.value)} type="date" /><button className="liquid-button" onClick=${() => shiftDate(1)} type="button">Next</button></div></div>`;
-}
-
-function FilterTabs({ filter, setFilter }) {
-  return html`<div className="tabs-row">${["all", "live", "finished", "scheduled"].map((id) => html`<button className=${`tab liquid-button ${filter === id ? "active" : ""}`} onClick=${() => setFilter(id)}>${{ all: "Tous", live: "Live", finished: "Termines", scheduled: "A venir" }[id]}</button>`)}</div>`;
-}
-
-function WorldCupStrip({ sportId, matches }) {
-  const fixtures = sportId === "football" ? matches.filter((match) => match.competition.id === "fifa.world") : [];
-  if (!fixtures.length) return html`<div className="quick-world-cup"></div>`;
-  return html`<div className="quick-world-cup visible"><div className="world-title"><span><${Flag} code="un" /> Coupe du monde 2026</span><span>${fixtures.length} match(s) ESPN</span></div>${fixtures.slice(0, 4).map((match) => html`<div key=${match.id}>${match.away.name} <strong>${match.away.score}</strong> - <strong>${match.home.score}</strong> ${match.home.name} <strong>${match.status}</strong></div>`)}</div>`;
+  const label = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", weekday: "short" }).format(new Date(`${date}T12:00:00`)).replace(".", "");
+  const tabs = [
+    ["all", "Tous"],
+    ["live", "Direct"],
+    ["odds", "Cotes"],
+    ["finished", "Termines"],
+    ["scheduled", "Prevus"],
+  ];
+  return html`
+    <div className="score-header">
+      <div className="tabs-row">${tabs.map(([id, label]) => html`<button className=${`tab ${filter === id ? "active" : ""}`} onClick=${() => setFilter(id)} type="button">${label}</button>`)}</div>
+      <div className="date-controls">
+        <button className="date-arrow" onClick=${() => shiftDate(-1)} type="button" aria-label="Jour precedent">‹</button>
+        <label className="date-picker"><span>▦</span><input value=${date} onChange=${(event) => setDate(event.target.value)} type="date" /><strong>${label}</strong></label>
+        <button className="date-arrow" onClick=${() => shiftDate(1)} type="button" aria-label="Jour suivant">›</button>
+      </div>
+    </div>
+  `;
 }
 
 function Scoreboard({ matches, favorites, toggleFavorite, openMatch }) {
   const groups = groupByCompetition(matches);
-  if (!groups.length) return html`<div className="match-list"><section className="competition"><div className="competition-head">Aucun match</div><div className="match-row">Aucun match pour ce filtre.</div></section></div>`;
-  return html`<div className="match-list">${groups.map(([key, items]) => html`<section className="competition" key=${key}><div className="competition-head"><span className="competition-title"><${Flag} code=${items[0].competition.flag} /> ${items[0].competition.country}: ${items[0].competition.label}</span><span>${items.length} match(s)</span></div>${items.map((match) => html`<${MatchRow} key=${match.id} match=${match} favorite=${favorites.includes(match.id)} toggleFavorite=${toggleFavorite} openMatch=${openMatch} />`)}</section>`)}</div>`;
+  if (!groups.length) return html`<div className="match-list"><section className="competition"><div className="competition-head"><span>Aucun match</span></div><div className="empty-match-row">Aucun match ESPN pour ce filtre.</div></section></div>`;
+  return html`<div className="match-list">${groups.map(([key, items]) => html`<section className="competition" key=${key}><div className="competition-head"><span className="competition-main"><button className="star-btn header-star" type="button">☆</button><${Flag} code=${items[0].competition.flag} /><strong>${items[0].competition.country.toUpperCase()}: ${items[0].competition.label}</strong><span className="pin-mark">●</span></span><button className="standings-link" type="button">Classement Live ˄</button></div>${items.map((match) => html`<${MatchRow} key=${match.id} match=${match} favorite=${favorites.includes(match.id)} toggleFavorite=${toggleFavorite} openMatch=${openMatch} />`)}</section>`)}</div>`;
 }
 
 function MatchRow({ match, favorite, toggleFavorite, openMatch }) {
-  return html`<div className="match-row"><button className=${`star-btn ${favorite ? "active" : ""}`} onClick=${() => toggleFavorite(match.id)}>*</button><span className=${`time-cell ${match.state === "in" ? "live" : ""}`}>${match.state === "in" ? "LIVE" : match.status}</span><${TeamCell} team=${match.away} /><span className=${`score ${match.away.winner ? "winner" : ""}`}>${match.away.score}</span><span className=${`score ${match.home.winner ? "winner" : ""}`}>${match.home.score}</span><${TeamCell} team=${match.home} side="right" /><button className="open-btn" onClick=${() => openMatch(match)}>Open</button></div>`;
+  const minute = match.state === "in" ? match.status : match.state === "post" ? "FT" : match.status;
+  const showPreview = match.state !== "in" && match.state !== "post";
+  return html`
+    <div className="match-row">
+      <button className=${`star-btn ${favorite ? "active" : ""}`} onClick=${() => toggleFavorite(match.id)} type="button">☆</button>
+      <button className=${`time-cell ${match.state === "in" ? "live" : ""}`} onClick=${() => openMatch(match)} type="button">${minute}</button>
+      <div className="teams-stack" onClick=${() => openMatch(match)} role="button" tabIndex="0">
+        <${TeamLine} team=${match.away} />
+        <${TeamLine} team=${match.home} />
+      </div>
+      <div className="scores-stack" onClick=${() => openMatch(match)} role="button" tabIndex="0">
+        <span className=${`score ${match.away.winner ? "winner" : ""}`}>${match.away.score}</span>
+        <span className=${`score ${match.home.winner ? "winner" : ""}`}>${match.home.score}</span>
+      </div>
+      <div className="preview-cell">${showPreview && html`<span>PREVIEW</span>`}</div>
+      <div className="match-actions"><button type="button" aria-label="Audio">♬</button><button type="button" aria-label="TV">▱</button><button type="button" aria-label="Stats">♜</button><button className="bet-btn" type="button">BET›</button></div>
+    </div>
+  `;
+}
+
+function TeamLine({ team }) {
+  const img = team.logo || (team.flag ? flagUrl(team.flag) : "");
+  return html`<span className="team-line">${img && html`<img className="team-logo" src=${img} alt="" loading="lazy" />`}<span className="team-name">${team.name}</span></span>`;
 }
 
 function TeamCell({ team, side = "" }) {
@@ -487,6 +522,99 @@ function FavoritesPage({ favorites, navigate, openMatch }) {
 
 function MatchModal({ match, onClose }) {
   return html`<div className="modal-backdrop"><div className="dialog dialog-open"><div className="dialog-card"><div className="dialog-top"><div><p className="eyebrow">${match.competition.country}: ${match.competition.label}</p><h2>${match.away.name} - ${match.home.name}</h2></div><button className="close-dialog" onClick=${onClose}>x</button></div><div className="dialog-score"><div className="dialog-team"><${TeamCell} team=${match.away} /><span>${match.away.name}</span></div><div className="dialog-total">${match.away.score} - ${match.home.score}</div><div className="dialog-team"><${TeamCell} team=${match.home} /><span>${match.home.name}</span></div></div><p><strong>Statut:</strong> ${match.status}</p><p><strong>Source:</strong> ${match.source}</p><p><strong>Lieu:</strong> ${match.venue || "Non renseigne"}</p></div></div></div>`;
+}
+
+function MatchPage({ match, navigate }) {
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSummary() {
+      if (!match) return;
+      setLoading("Chargement du resume ESPN...");
+      try {
+        const payload = await fetchJson(summaryUrl(match));
+        if (!cancelled) {
+          setSummary(payload);
+          setLoading("Resume ESPN charge en temps reel");
+        }
+      } catch {
+        if (!cancelled) {
+          setSummary(null);
+          setLoading("Resume ESPN indisponible pour ce match");
+        }
+      }
+    }
+    loadSummary();
+    const timer = window.setInterval(loadSummary, 45000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [match?.id]);
+
+  if (!match) return html`<main className="page-shell match-page"><button className="liquid-button ghost back-button" onClick=${() => navigate("scores")}>Retour aux scores</button><div className="empty-panel"><h2>Match introuvable</h2><p>Retourne aux scores et ouvre un match charge depuis ESPN.</p></div></main>`;
+
+  const competition = summary?.header?.competitions?.[0] || {};
+  const competitors = competition.competitors || [];
+  const homeSummary = competitors.find((item) => item.homeAway === "home");
+  const awaySummary = competitors.find((item) => item.homeAway === "away");
+  const homeScore = homeSummary?.score ?? match.home.score;
+  const awayScore = awaySummary?.score ?? match.away.score;
+  const status = summary?.header?.competitions?.[0]?.status?.type?.shortDetail || match.status;
+  const commentary = (summary?.commentary || []).slice(-8).reverse();
+  const keyEvents = (summary?.keyEvents || []).filter((item) => item.text).slice(-6).reverse();
+  const odds = summary?.odds?.[0] || null;
+  const stats = summary?.boxscore?.teams || [];
+  const homeStats = stats.find((item) => item.team?.displayName === match.home.name)?.statistics || [];
+  const awayStats = stats.find((item) => item.team?.displayName === match.away.name)?.statistics || [];
+  return html`
+    <main className="page-shell match-page">
+      <div className="match-breadcrumb"><button onClick=${() => navigate("scores")} type="button">Football</button><span>›</span><span>${match.competition.country}</span><span>›</span><strong>${match.competition.label}</strong><button className="new-window-btn" type="button">Nouvelle fenetre</button></div>
+      <section className="match-hero">
+        <button className="star-btn" type="button">☆</button>
+        <div className="match-team-card"><${TeamBadge} team=${match.away} /><strong>${match.away.name}</strong><span>${match.away.code || ""}</span></div>
+        <div className="match-score-card"><span>${formatMatchDate(match.date)}</span><strong>${awayScore} - ${homeScore}</strong><small>${status}</small><p>${loading}</p></div>
+        <div className="match-team-card"><${TeamBadge} team=${match.home} /><strong>${match.home.name}</strong><span>${match.home.code || ""}</span></div>
+        <button className="star-btn" type="button">☆</button>
+      </section>
+      <nav className="match-tabs"><button className="active">Match</button><button>Cotes</button><button>Tat</button><button>Classements</button><button>Actualites</button></nav>
+      <div className="match-subtabs"><button className="active">Resume</button><button>Stats</button><button>Compos</button><button>Stats joueurs</button><button>Commentaires</button></div>
+      <section className="match-section"><h3>Resume ESPN</h3>${keyEvents.length ? keyEvents.map((item) => html`<div className="event-line"><span>${item.clock?.displayValue || ""}</span><p>${item.text}</p></div>`) : html`<p className="muted">Aucun evenement cle ESPN charge.</p>`}</section>
+      <section className="match-section"><h3>Commentaires</h3>${commentary.length ? commentary.map((item) => html`<div className="comment-line"><strong>${item.time?.displayValue || ""}</strong><p>${item.text}</p></div>`) : html`<p className="muted">Aucun commentaire ESPN charge.</p>`}</section>
+      <section className="match-section odds-section"><h3>Cotes ${odds?.provider?.name ? html`<span>${odds.provider.name}</span>` : ""}</h3><div className="odds-grid"><div><span>1</span><strong>${formatOdds(odds?.homeTeamOdds)}</strong></div><div><span>X</span><strong>${formatDrawOdds(odds)}</strong></div><div><span>2</span><strong>${formatOdds(odds?.awayTeamOdds)}</strong></div></div></section>
+      <section className="match-section"><h3>Stats ESPN</h3><${StatsTable} home=${homeStats} away=${awayStats} homeName=${match.home.name} awayName=${match.away.name} /></section>
+    </main>
+  `;
+}
+
+function TeamBadge({ team }) {
+  const img = team.logo || (team.flag ? flagUrl(team.flag) : "");
+  return html`<div className="team-badge">${img && html`<img src=${img} alt="" />`}</div>`;
+}
+
+function formatMatchDate(date) {
+  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(`${date}T12:00:00`));
+}
+
+function formatOdds(teamOdds) {
+  return teamOdds?.moneyLine ?? teamOdds?.odds?.summary ?? "-";
+}
+
+function formatDrawOdds(odds) {
+  return odds?.drawOdds?.moneyLine ?? odds?.drawOdds?.summary ?? "-";
+}
+
+function StatsTable({ home, away, homeName, awayName }) {
+  const rows = (away.length ? away : home).slice(0, 8);
+  if (!rows.length) return html`<p className="muted">Stats ESPN indisponibles pour ce match.</p>`;
+  return html`<div className="stats-table"><div className="stats-head"><strong>${awayName}</strong><strong>${homeName}</strong></div>${rows.map((row) => {
+    const homeRow = home.find((item) => item.name === row.name || item.label === row.label) || {};
+    const awayValue = row.displayValue || row.value || "0";
+    const homeValue = homeRow.displayValue || homeRow.value || "0";
+    return html`<div className="stat-row"><span>${awayValue}</span><p>${row.label || row.name}</p><span>${homeValue}</span></div>`;
+  })}</div>`;
 }
 
 function Footer({ navigate, sport, matches, news }) {
