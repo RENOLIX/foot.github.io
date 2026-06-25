@@ -241,7 +241,7 @@ button {
   border-radius: 8px;
   background:
     linear-gradient(110deg, rgba(7, 16, 14, 0.92) 0%, rgba(10, 30, 25, 0.84) 48%, rgba(7, 16, 14, 0.5) 100%),
-    url("public/assets/hero-stadium.png"),
+    url("public/assets/hero-stadium.png?v=1ece041"),
     var(--dark);
   background-position: center;
   background-size: cover;
