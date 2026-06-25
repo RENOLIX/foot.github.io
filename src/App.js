@@ -109,7 +109,7 @@ const SPORTS = [
 
 const SPORT_NAV_ITEMS = [
   { id: "football", label: "Football", target: "football" },
-  { id: "world-cup", label: "Coupe du Monde", target: "football", query: "Championnat du Monde" },
+  { id: "world-cup", label: "Coupe du Monde", target: "football", query: "Coupe du monde" },
   { id: "basketball", label: "Basket", target: "basketball" },
   { id: "tennis", label: "Tennis", target: "tennis" },
   { id: "rugby", label: "Rugby", target: "rugby" },
@@ -119,43 +119,8 @@ const SPORT_NAV_ITEMS = [
   { id: "more", label: "Autres", target: "other" },
 ];
 
-const WORLD_CUP_FIXTURES = [
-  wc("2026-06-25", "Equateur", "ec", "Allemagne", "de", "20:00"),
-  wc("2026-06-25", "Curacao", "cw", "Cote d'Ivoire", "ci", "23:00"),
-  wc("2026-06-26", "Tunisie", "tn", "Pays-Bas", "nl", "17:00"),
-  wc("2026-06-26", "Japon", "jp", "Suede", "se", "17:00"),
-  wc("2026-06-26", "Paraguay", "py", "Australie", "au", "20:00"),
-  wc("2026-06-26", "Turquie", "tr", "Etats-Unis", "us", "20:00"),
-  wc("2026-06-26", "Norvege", "no", "France", "fr", "23:00"),
-  wc("2026-06-26", "Senegal", "sn", "Irak", "iq", "23:00"),
-  wc("2026-06-27", "Uruguay", "uy", "Espagne", "es", "17:00"),
-  wc("2026-06-27", "Cap-Vert", "cv", "Arabie saoudite", "sa", "17:00"),
-  wc("2026-06-27", "Nouvelle-Zelande", "nz", "Belgique", "be", "20:00"),
-  wc("2026-06-27", "Egypte", "eg", "Iran", "ir", "20:00"),
-  wc("2026-06-27", "Panama", "pa", "Angleterre", "gb-eng", "23:00"),
-  wc("2026-06-27", "Croatie", "hr", "Ghana", "gh", "23:00"),
-  wc("2026-06-28", "Colombie", "co", "Portugal", "pt", "17:00"),
-  wc("2026-06-28", "RD Congo", "cd", "Ouzbekistan", "uz", "17:00"),
-  wc("2026-06-28", "Jordanie", "jo", "Argentine", "ar", "20:00"),
-  wc("2026-06-28", "Algerie", "dz", "Autriche", "at", "20:00"),
-  wc("2026-06-28", "Afrique du Sud", "za", "Canada", "ca", "23:00"),
-];
-
 function league(id, label, country, flag, path, pinned = false) {
   return { id, label, country, flag, path, pinned };
-}
-
-function wc(date, home, homeFlag, away, awayFlag, time) {
-  return {
-    id: `world-cup-${date}-${home}-${away}`.toLowerCase().replaceAll(" ", "-"),
-    date,
-    status: time,
-    state: "pre",
-    source: "Calendrier",
-    competition: { id: "worldcup2026", label: "Championnat du Monde", country: "Monde", flag: "un" },
-    home: { name: home, code: homeFlag.toUpperCase(), flag: homeFlag, score: "-" },
-    away: { name: away, code: awayFlag.toUpperCase(), flag: awayFlag, score: "-" },
-  };
 }
 
 function readRoute() {
@@ -185,6 +150,16 @@ function todayInAlgiers() {
 
 function scoreboardUrl(item, date) {
   return `${ESPN_BASE}/${item.path}/scoreboard?dates=${espnDate(date)}`;
+}
+
+function previousDate(date) {
+  const current = new Date(`${date}T00:00:00`);
+  current.setDate(current.getDate() - 1);
+  return current.toISOString().slice(0, 10);
+}
+
+function uniqueMatches(matches) {
+  return [...new Map(matches.map((match) => [match.id, match])).values()];
 }
 
 function newsUrl(sport) {
@@ -276,34 +251,33 @@ function App() {
       setLoadingLabel("Chargement des matches ESPN...");
       setMatches([]);
       if (!sport.leagues.length) {
-        const nextNews = fallbackNews(sport);
         if (!cancelled) {
           setMatches([]);
-          setNews(nextNews);
+          setNews([]);
           setLoadingLabel(sport.unavailable || "Aucun flux ESPN configure pour ce sport.");
         }
         return;
       }
       const settled = await Promise.allSettled(
         sport.leagues.map(async (item) => {
-          const payload = await fetchJson(scoreboardUrl(item, date));
-          return (payload.events || []).map((event) => normalizeEvent(event, item));
+          const dates = item.id === "fifa.world" ? [previousDate(date), date] : [date];
+          const payloads = await Promise.allSettled(dates.map((value) => fetchJson(scoreboardUrl(item, value))));
+          return payloads.flatMap((result) => (result.status === "fulfilled" ? (result.value.events || []).map((event) => normalizeEvent(event, item)) : []));
         }),
       );
-      const espnMatches = settled.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
-      const worldCup = sport.id === "football" ? WORLD_CUP_FIXTURES.filter((match) => match.date === date) : [];
+      const espnMatches = uniqueMatches(settled.flatMap((result) => (result.status === "fulfilled" ? result.value : [])));
       let nextNews = [];
       try {
         nextNews = normalizeNews(await fetchJson(newsUrl(sport)));
       } catch {
-        nextNews = fallbackNews(sport);
+        nextNews = [];
       }
       if (!cancelled) {
         const failed = settled.filter((result) => result.status === "rejected").length;
-        setMatches([...worldCup, ...espnMatches]);
+        setMatches(espnMatches);
         setNews(nextNews);
         setLastUpdated(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-        setLoadingLabel(`${worldCup.length + espnMatches.length} match(s) affiches - ${sport.leagues.length - failed}/${sport.leagues.length} competitions ESPN chargees`);
+        setLoadingLabel(`${espnMatches.length} match(s) affiches - ${sport.leagues.length - failed}/${sport.leagues.length} competitions ESPN chargees`);
       }
     }
     load();
@@ -336,7 +310,7 @@ function App() {
   }, [matches, query, filter]);
 
   const favoriteMatches = matches.filter((match) => favorites.includes(match.id));
-  const currentArticle = news.find((item) => item.id === route.id) || news[0] || fallbackNews(sport)[0];
+  const currentArticle = news.find((item) => item.id === route.id) || news[0] || null;
   const toggleFavorite = (id) => setFavorites((items) => (items.includes(id) ? items.filter((item) => item !== id) : [...items, id]));
   const changeSport = (id, nextQuery = "", nextNavId = id) => {
     setSportId(id);
@@ -366,7 +340,7 @@ function App() {
           <section className="center-panel">
             <${ScoreToolbar} sport=${sport} date=${date} setDate=${setDate} />
             <${FilterTabs} filter=${filter} setFilter=${setFilter} />
-            <${WorldCupStrip} sportId=${sportId} date=${date} />
+            <${WorldCupStrip} sportId=${sportId} matches=${matches} />
             <div className="status-line"><span>${loadingLabel}${lastUpdated ? ` - MAJ ${lastUpdated}` : ""}</span><button className="liquid-button dark" type="button" onClick=${() => setRefreshKey((value) => value + 1)}>Actualiser</button></div>
             <${Scoreboard} matches=${visibleMatches} favorites=${favorites} toggleFavorite=${toggleFavorite} openMatch=${setSelectedMatch} />
           </section>
@@ -470,10 +444,10 @@ function FilterTabs({ filter, setFilter }) {
   return html`<div className="tabs-row">${["all", "live", "finished", "scheduled"].map((id) => html`<button className=${`tab liquid-button ${filter === id ? "active" : ""}`} onClick=${() => setFilter(id)}>${{ all: "Tous", live: "Live", finished: "Termines", scheduled: "A venir" }[id]}</button>`)}</div>`;
 }
 
-function WorldCupStrip({ sportId, date }) {
-  const fixtures = sportId === "football" ? WORLD_CUP_FIXTURES.filter((match) => match.date === date) : [];
+function WorldCupStrip({ sportId, matches }) {
+  const fixtures = sportId === "football" ? matches.filter((match) => match.competition.id === "fifa.world") : [];
   if (!fixtures.length) return html`<div className="quick-world-cup"></div>`;
-  return html`<div className="quick-world-cup visible"><div className="world-title"><span><${Flag} code="un" /> Coupe du monde 2026</span><span>${fixtures.length} match(s)</span></div>${fixtures.slice(0, 4).map((match) => html`<div key=${match.id}><${Flag} code=${match.home.flag} /> ${match.home.name} - <${Flag} code=${match.away.flag} /> ${match.away.name} <strong>${match.status}</strong></div>`)}</div>`;
+  return html`<div className="quick-world-cup visible"><div className="world-title"><span><${Flag} code="un" /> Coupe du monde 2026</span><span>${fixtures.length} match(s) ESPN</span></div>${fixtures.slice(0, 4).map((match) => html`<div key=${match.id}>${match.away.name} <strong>${match.away.score}</strong> - <strong>${match.home.score}</strong> ${match.home.name} <strong>${match.status}</strong></div>`)}</div>`;
 }
 
 function Scoreboard({ matches, favorites, toggleFavorite, openMatch }) {
@@ -499,10 +473,11 @@ function RightPanel({ sport, news, matches, openNews, navigate, selectSearch }) 
 }
 
 function NewsPage({ sport, news, navigate }) {
-  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">${sport.label}</p><h1>Actualites sportives</h1><p>Articles consultables directement dans Foot Live, sans ouvrir ESPN dans un onglet externe.</p></section><div className="news-grid">${news.map((item) => html`<button className="article-card" key=${item.id} onClick=${() => navigate("article", item.id)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="article-fallback">FL</div>`}<span><small>${sport.label}</small><strong>${item.title}</strong><p>${item.description || "Lire l'article complet dans le site."}</p></span></button>`)}</div></main>`;
+  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">${sport.label}</p><h1>Actualites sportives</h1><p>Articles consultables directement dans Foot Live, sans ouvrir ESPN dans un onglet externe.</p></section>${news.length ? html`<div className="news-grid">${news.map((item) => html`<button className="article-card" key=${item.id} onClick=${() => navigate("article", item.id)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="article-fallback">FL</div>`}<span><small>${sport.label}</small><strong>${item.title}</strong><p>${item.description || "Lire l'article complet dans le site."}</p></span></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucune actualite ESPN chargee</h2><p>Le site n'affiche pas d'actualite locale inventee.</p></div>`}</main>`;
 }
 
 function ArticlePage({ article, sport, navigate }) {
+  if (!article) return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualites</button><div className="empty-panel"><h2>Aucun article ESPN charge</h2><p>Le site n'affiche pas de faux article local.</p></div></main>`;
   return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualites</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualite</p><h1>${article.title}</h1>${article.image && html`<img className="article-hero" src=${article.image} alt="" />`}<p className="article-lead">${article.description || ""}</p><p>${article.body || article.description || "Article affiche directement dans Foot Live."}</p></article></main>`;
 }
 
@@ -515,12 +490,17 @@ function MatchModal({ match, onClose }) {
 }
 
 function Footer({ navigate, sport, matches, news }) {
+  const worldCupItems = matches.filter((match) => match.competition.id === "fifa.world").slice(0, 10).map(matchLabel);
+  const popularItems = sport.leagues.slice(0, 10).map((item) => item.label);
+  const liveItems = matches.filter((match) => match.state === "in").slice(0, 10).map(matchLabel);
+  const footballItems = sport.id === "football" ? matches.slice(0, 10).map(matchLabel) : [];
+  const directItems = matches.slice(0, 10).map(matchLabel);
   const footerColumns = [
-    ["CDM 2026", "Resultat Coupe du Monde 2026", "Calendrier Coupe du monde 2026", "Coupe du monde 2026 classements des groupes", "Actualites de la Coupe du monde", "France", "Maroc", "Algerie", "Paris sportifs", "Meilleurs sites de paris sportifs", "Meilleurs bonus de paris sportif"],
-    ["Populaire", "ATP Eastbourne 2026", "ATP Wimbledon 2026", "WTA Bad Homburg 2026", "Ligue des Nations 2026", "Top 14", "MLB 2026", "Ligue des Nations Feminine 2026", "World Matchplay", "CHAN U17 2026", "Tournoi Maurice Revello 2026"],
-    ["Livescore", "France - Cuba", "France - Serbie", "Algerie - Autriche", "France - Japon", "Belgique - France", "Nouvelle-Zelande - France", "Norvege - France", "Senegal - Irak", "Panama - Angleterre", "Croatie - Ghana"],
-    ["Football Live", "Norvege - France", "Wydad AC - Maghreb Fez", "Berkane - FAR Rabat", "Paraguay - Australie", "Turquie - Etats-Unis", "Wydad AC - Dcheira", "FAR Rabat - Union Touarga", "Afrique du Sud - Canada", "Seekirchen - Red Bull Salzburg", "River Plate - Flamengo"],
-    ["Match en direct", "Tunisie - Pays-Bas", "Equateur - Allemagne", "Curacao - Cote d'Ivoire", "Japon - Suede", "Uruguay - Espagne", "Cap-Vert - Arabie Saoudite", "Nouvelle-Zelande - Belgique", "Egypte - Iran", "Molde - Bodo/Glimt", "Bodo/Glimt - Start"],
+    ["CDM 2026", ...filledItems(worldCupItems, "Aucun match ESPN charge")],
+    ["Populaire", ...filledItems(popularItems, "Aucune competition chargee")],
+    ["Livescore", ...filledItems(liveItems, "Aucun live ESPN charge")],
+    ["Football Live", ...filledItems(footballItems, "Selectionne Football")],
+    ["Match en direct", ...filledItems(directItems, "Aucun match ESPN charge")],
   ];
   const legalLeft = ["Conditions d'utilisation", "Politique de confidentialite", "RGPD et journalisme", "Impressum", "Publicite", "Contact"];
   const legalRight = ["Mobile", "Livescore", "Sites recommandes", "FAQ", "Audio", "Bonus de paris sportifs"];
@@ -554,7 +534,7 @@ function Footer({ navigate, sport, matches, news }) {
 }
 
 function countForLeague(matches, id) {
-  return matches.filter((match) => match.competition.id === id || (match.competition.id === "worldcup2026" && id === "fifa.world")).length;
+  return matches.filter((match) => match.competition.id === id).length;
 }
 
 function groupByCompetition(matches) {
@@ -566,11 +546,12 @@ function groupByCompetition(matches) {
   return [...map.entries()];
 }
 
-function fallbackNews(sport) {
-  return [
-    { id: "status-news-1", title: `Flux actualites ${sport.label} temporairement indisponible`, description: "Le site garde les scores actifs et recharge les articles ESPN des que le flux repond.", body: "Aucune actualite inventee: ce message indique seulement que le flux ESPN n'a pas repondu au moment du chargement." },
-    { id: "status-news-2", title: "Scores, drapeaux et competitions restent disponibles", description: "Les tableaux de matchs continuent d'utiliser les endpoints sportifs configures par discipline.", body: "Les informations affichees dans les scores proviennent des flux de calendrier et de scoreboard, avec les competitions separees par sport." },
-  ];
+function matchLabel(match) {
+  return `${match.away.name} ${match.away.score} - ${match.home.score} ${match.home.name}`;
+}
+
+function filledItems(items, emptyLabel) {
+  return items.length ? items : [emptyLabel];
 }
 
 createRoot(document.getElementById("root")).render(html`<${App} />`);
