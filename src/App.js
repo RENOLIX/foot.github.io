@@ -62,6 +62,18 @@ const SPORTS = [
   },
 ];
 
+const SPORT_NAV_ITEMS = [
+  { id: "football", label: "Football", target: "football" },
+  { id: "world-cup", label: "Coupe du Monde", target: "football", query: "Coupe du monde" },
+  { id: "basketball", label: "Basket", target: "basketball" },
+  { id: "tennis", label: "Tennis", query: "Tennis" },
+  { id: "rugby", label: "Rugby", query: "Rugby" },
+  { id: "handball", label: "Handball", query: "Handball" },
+  { id: "volleyball", label: "Volley", query: "Volley" },
+  { id: "hockey", label: "Hockey", target: "hockey" },
+  { id: "more", label: "Autres", query: "" },
+];
+
 const WORLD_CUP_FIXTURES = [
   wc("2026-06-25", "Equateur", "ec", "Allemagne", "de", "20:00"),
   wc("2026-06-25", "Curacao", "cw", "Cote d'Ivoire", "ci", "23:00"),
@@ -254,10 +266,10 @@ function App() {
   const favoriteMatches = matches.filter((match) => favorites.includes(match.id));
   const currentArticle = news.find((item) => item.id === route.id) || news[0] || fallbackNews(sport)[0];
   const toggleFavorite = (id) => setFavorites((items) => (items.includes(id) ? items.filter((item) => item !== id) : [...items, id]));
-  const changeSport = (id) => {
+  const changeSport = (id, nextQuery = "") => {
     setSportId(id);
     setFilter("all");
-    setQuery("");
+    setQuery(nextQuery);
     navigate("scores");
   };
   const selectSearch = (term) => {
@@ -270,7 +282,7 @@ function App() {
       <${TopAnnouncement} />
       <${Topbar} query=${query} setQuery=${setQuery} route=${route} navigate=${navigate} />
       <${HeroBanner} sport=${sport} matches=${matches} navigate=${navigate} />
-      <${SportsBar} sportId=${sportId} setSportId=${changeSport} />
+      <${SportsBar} sportId=${sportId} setSportId=${changeSport} selectSearch=${selectSearch} />
       ${route.view === "news" && html`<${NewsPage} sport=${sport} news=${news} navigate=${navigate} />`}
       ${route.view === "article" && html`<${ArticlePage} article=${currentArticle} sport=${sport} navigate=${navigate} />`}
       ${route.view === "favorites" && html`<${FavoritesPage} favorites=${favoriteMatches} navigate=${navigate} openMatch=${setSelectedMatch} />`}
@@ -333,17 +345,30 @@ function HeroBanner({ sport, matches, navigate }) {
   `;
 }
 
-function SportsBar({ sportId, setSportId }) {
+function SportsBar({ sportId, setSportId, selectSearch }) {
+  const selectItem = (item) => {
+    if (item.target) {
+      setSportId(item.target, item.query || "");
+      return;
+    }
+    selectSearch(item.query || "");
+  };
   return html`<nav className="sports-bar" aria-label="Sports">
-    ${SPORTS.map((sport) => html`<button key=${sport.id} className=${`sport-btn liquid-button ${sport.id === sportId ? "active" : ""}`} onClick=${() => setSportId(sport.id)}><span className="sport-icon-wrap"><${SportIcon} id=${sport.id} /></span>${sport.label}</button>`)}
+    ${SPORT_NAV_ITEMS.map((item) => html`<button key=${item.id} className=${`sport-btn ${item.target === sportId && !item.query ? "active" : ""} ${item.id === "world-cup" && sportId === "football" ? "world-cup-btn" : ""}`} onClick=${() => selectItem(item)}><span className="sport-icon-wrap"><${SportIcon} id=${item.id} /></span><span>${item.label}</span></button>`)}
   </nav>`;
 }
 
 function SportIcon({ id }) {
+  if (id === "world-cup") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v3.5c0 3.1-1.7 5.2-4 5.2s-4-2.1-4-5.2V4Z" /><path d="M8 6H5.5c0 3 .9 4.7 3.2 5.3M16 6h2.5c0 3-.9 4.7-3.2 5.3M12 12.7V17M8.8 20h6.4M10 17h4" /><circle className="cup-dot" cx="17.4" cy="5.2" r="1.8" /></svg>`;
   if (id === "basketball") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.8 12h16.4M12 3.5v17M5.8 6.2c3 2.4 4.6 5.9 4.7 10.8M18.2 6.2c-3 2.4-4.6 5.9-4.7 10.8" /></svg>`;
+  if (id === "tennis") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="10.2" cy="9.2" rx="4.2" ry="6.1" transform="rotate(35 10.2 9.2)" /><path d="M13.3 13.7 19 20M7.6 5.5l5.6 7.4M5.8 8.4l5.8 7.6" /></svg>`;
+  if (id === "rugby") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15.5C7.8 20.2 16.2 20.2 20 8.5C16.2 3.8 7.8 3.8 4 15.5Z" /><path d="M8 15.5 16 8.5M10 12l3 3M12 10l3 3" /></svg>`;
+  if (id === "handball") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="17.2" cy="5.6" r="2" /><path d="M9 8.5 13 7l2.5 3.5M13 7l-1.4 5.2 3.4 2.2M11.6 12.2 8 17.5M15 14.4l2.7 4.8M7 5.8l2.8 2.7" /></svg>`;
+  if (id === "volleyball") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5c.6 3.7 2.7 6.1 6.8 7M12 3.5C8.7 5 6.7 7.5 6 11.4M3.8 13.8c3.9-1.9 7.5-1.5 10.8 1.1M7 18.5c.7-3.6 2.8-6.1 6.4-7.6M18.7 13.5c-2.8 2-5.5 4-6 7" /></svg>`;
   if (id === "american-football") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15.5C7.8 20.2 16.2 20.2 20 8.5C16.2 3.8 7.8 3.8 4 15.5Z" /><path d="M8 15.5 16 8.5M10 12l3 3M12 10l3 3" /></svg>`;
   if (id === "baseball") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M7 5.4c2.3 3.1 2.3 10.1 0 13.2M17 5.4c-2.3 3.1-2.3 10.1 0 13.2M7.7 8.2l1.7.9M7.5 11l1.9.4M7.6 13.8l1.8-.5M16.3 8.2l-1.7.9M16.5 11l-1.9.4M16.4 13.8l-1.8-.5" /></svg>`;
   if (id === "hockey") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v10.5c0 2.5 1.7 3.5 4 3.5h5.5c1.8 0 3-1 3-2.4 0-1.2-1-2.1-2.5-2.1h-4" /><path d="M12 18h-8M3 20h6" /></svg>`;
+  if (id === "more") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" /></svg>`;
   return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.4 15.9 10l-1.5 4.5H9.6L8.1 10 12 7.4ZM12 3.5v3.9M4.5 9.2 8.1 10M6.2 18.2l3.4-3.7M17.8 18.2l-3.4-3.7M19.5 9.2 15.9 10" /></svg>`;
 }
 
@@ -420,25 +445,39 @@ function MatchModal({ match, onClose }) {
 }
 
 function Footer({ navigate, sport, matches, news }) {
-  const live = matches.filter((match) => match.state === "in").length;
-  const competitions = new Set(matches.map((match) => match.competition.label)).size;
+  const footerColumns = [
+    ["CDM 2026", "Resultat Coupe du Monde 2026", "Calendrier Coupe du monde 2026", "Coupe du monde 2026 classements des groupes", "Actualites de la Coupe du monde", "France", "Maroc", "Algerie", "Paris sportifs", "Meilleurs sites de paris sportifs", "Meilleurs bonus de paris sportif"],
+    ["Populaire", "ATP Eastbourne 2026", "ATP Wimbledon 2026", "WTA Bad Homburg 2026", "Ligue des Nations 2026", "Top 14", "MLB 2026", "Ligue des Nations Feminine 2026", "World Matchplay", "CHAN U17 2026", "Tournoi Maurice Revello 2026"],
+    ["Livescore", "France - Cuba", "France - Serbie", "Algerie - Autriche", "France - Japon", "Belgique - France", "Nouvelle-Zelande - France", "Norvege - France", "Senegal - Irak", "Panama - Angleterre", "Croatie - Ghana"],
+    ["Football Live", "Norvege - France", "Wydad AC - Maghreb Fez", "Berkane - FAR Rabat", "Paraguay - Australie", "Turquie - Etats-Unis", "Wydad AC - Dcheira", "FAR Rabat - Union Touarga", "Afrique du Sud - Canada", "Seekirchen - Red Bull Salzburg", "River Plate - Flamengo"],
+    ["Match en direct", "Tunisie - Pays-Bas", "Equateur - Allemagne", "Curacao - Cote d'Ivoire", "Japon - Suede", "Uruguay - Espagne", "Cap-Vert - Arabie Saoudite", "Nouvelle-Zelande - Belgique", "Egypte - Iran", "Molde - Bodo/Glimt", "Bodo/Glimt - Start"],
+  ];
+  const legalLeft = ["Conditions d'utilisation", "Politique de confidentialite", "RGPD et journalisme", "Impressum", "Publicite", "Contact"];
+  const legalRight = ["Mobile", "Livescore", "Sites recommandes", "FAQ", "Audio", "Bonus de paris sportifs"];
+  const social = ["Facebook", "X", "Instagram", "TikTok"];
   return html`
     <footer className="site-footer">
-      <div className="footer-brand">
-        <span className="brand-mark">FL</span>
-        <div><strong>Foot Live</strong><p>Scores en direct, Coupe du monde 2026, actualites integrees et drapeaux reels.</p></div>
+      <div className="footer-link-grid">
+        ${footerColumns.map(([title, ...items]) => html`<section><h3>${title}</h3>${items.map((item) => html`<button type="button" onClick=${() => navigate("scores")}>${item}</button>`)}</section>`)}
       </div>
-      <div className="footer-stats">
-        <div><strong>${matches.length}</strong><span>matchs</span></div>
-        <div><strong>${live}</strong><span>live</span></div>
-        <div><strong>${competitions}</strong><span>competitions</span></div>
-        <div><strong>${news.length}</strong><span>actus</span></div>
+      <div className="footer-meta">
+        <section>
+          <h3>Footlive.fr</h3>
+          <div className="footer-mini-grid">${legalLeft.map((item) => html`<button type="button">${item}</button>`)}</div>
+        </section>
+        <section>
+          <h3>&nbsp;</h3>
+          <div className="footer-mini-grid">${legalRight.map((item) => html`<button type="button">${item}</button>`)}</div>
+        </section>
+        <section>
+          <h3>Suivez nous</h3>
+          <div className="social-list">${social.map((item) => html`<button type="button"><span className="social-dot">${item[0]}</span>${item}</button>`)}</div>
+        </section>
       </div>
-      <div className="footer-columns">
-        <section><h3>Navigation</h3><button onClick=${() => navigate("scores")}>Resultats</button><button onClick=${() => navigate("news")}>Actualites</button><button onClick=${() => navigate("favorites")}>Favoris</button></section>
-        <section><h3>Sports</h3>${SPORTS.map((item) => html`<button onClick=${() => navigate("scores")}><${SportIcon} id=${item.id} />${item.label}</button>`)}</section>
-        <section><h3>${sport.label}</h3>${sport.leagues.slice(0, 5).map((item) => html`<button onClick=${() => navigate("scores")}><${Flag} code=${item.flag} />${item.label}</button>`)}</section>
-        <section><h3>Donnees</h3><p>Flux scores et actualites ESPN, drapeaux FlagCDN, favoris stockes localement sans compte client.</p></section>
+      <div className="footer-bottom">
+        <button type="button" className="lite-link">Version lite</button>
+        <p>Jeu responsable. Gambling Therapy. 18+</p>
+        <p>Copyright © 2026 Footlive.fr | Definir la confidentialite</p>
       </div>
     </footer>
   `;

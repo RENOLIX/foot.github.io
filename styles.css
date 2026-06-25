@@ -27,6 +27,7 @@
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
   background:
     linear-gradient(135deg, rgba(9, 168, 111, 0.08), transparent 34%),
     linear-gradient(225deg, rgba(36, 107, 254, 0.07), transparent 36%),
@@ -179,7 +180,6 @@ button {
 
 .liquid-button.active,
 .main-link.active,
-.sport-btn.active,
 .tab.active {
   color: #ffffff;
   border-color: var(--green);
@@ -286,31 +286,87 @@ button {
 
 .sports-bar {
   margin-top: 10px;
-  padding: 8px;
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 0;
+  min-height: 48px;
+  padding: 0;
+  overflow: visible;
+  border-radius: 0;
+  background: #f2f5f7;
+}
+
+.sport-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 11px;
+  border: 0;
+  border-left: 1px solid rgba(213, 221, 226, 0.78);
+  border-radius: 0;
+  color: #4e5c62;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.sport-btn:first-child {
+  border-left: 0;
+}
+
+.sport-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 3px;
+  background: transparent;
+}
+
+.sport-btn.active,
+.sport-btn:hover,
+.sport-btn:focus-visible {
+  color: #e8002a;
+  background: #ffffff;
+}
+
+.sport-btn.active::before {
+  background: #ff0040;
 }
 
 .sport-icon-wrap {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background: rgba(11, 23, 20, 0.07);
+  width: 22px;
+  height: 22px;
+  border-radius: 0;
+  background: transparent;
 }
 
-.sport-btn.active .sport-icon-wrap {
-  background: rgba(255, 255, 255, 0.18);
+.sport-btn span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .sport-icon {
-  width: 19px;
-  height: 19px;
+  width: 21px;
+  height: 21px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.8;
+  stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.cup-dot {
+  fill: #ff0040;
+  stroke: #ff0040;
 }
 
 .page-grid {
@@ -865,75 +921,42 @@ h1 {
 
 .site-footer {
   display: grid;
-  grid-template-columns: minmax(260px, 0.9fr) minmax(220px, 0.8fr) minmax(0, 1.8fr);
-  gap: 22px;
-  align-items: start;
+  gap: 0;
   margin-top: 12px;
-  padding: 24px;
-  color: #eafff7;
-  border-color: var(--line-dark);
-  background:
-    linear-gradient(135deg, rgba(11, 23, 20, 0.98), rgba(15, 47, 39, 0.96)),
-    var(--dark);
-}
-
-.footer-brand {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.footer-brand .brand-mark {
-  flex: 0 0 auto;
+  padding: 0;
+  color: #001e28;
+  border-color: #e4eaee;
+  background: #ffffff;
 }
 
 .site-footer p,
 .site-footer span {
-  margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.66);
+  margin: 0;
+  color: #6d7a80;
   line-height: 1.55;
 }
 
-.footer-stats,
-.footer-columns {
+.footer-link-grid {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 54px;
+  padding: 38px 18px 28px;
 }
 
-.footer-stats {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.footer-stats div {
-  min-height: 76px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.footer-stats strong {
-  display: block;
-  color: #ffffff;
-  font-size: 28px;
-}
-
-.footer-columns {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.footer-columns section {
+.footer-link-grid section,
+.footer-meta section {
   display: grid;
   align-content: start;
-  gap: 7px;
+  gap: 10px;
 }
 
-.footer-columns h3 {
-  margin: 0 0 4px;
-  color: #ffffff;
+.footer-link-grid h3,
+.footer-meta h3 {
+  margin: 0 0 8px;
+  color: #001e28;
   font-size: 12px;
-  letter-spacing: 0;
+  font-weight: 900;
+  letter-spacing: 0.35px;
   text-transform: uppercase;
 }
 
@@ -941,24 +964,66 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 34px;
+  min-height: 22px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-width: 0 0 1px;
+  border: 0;
   border-radius: 0;
-  color: #ffffff;
+  color: #001e28;
   background: transparent;
+  font-size: 12px;
+  font-weight: 500;
   text-align: left;
 }
 
-.site-footer .sport-icon {
-  width: 16px;
-  height: 16px;
+.site-footer button:hover,
+.site-footer button:focus-visible {
+  color: #e8002a;
 }
 
-.site-footer .flag {
+.footer-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 54px;
+  padding: 28px 18px 34px;
+  border-top: 1px solid #e6ecef;
+}
+
+.footer-mini-grid,
+.social-list {
+  display: grid;
+  gap: 14px;
+}
+
+.social-list button {
+  min-height: 25px;
+}
+
+.social-dot {
+  display: inline-grid;
+  place-items: center;
   width: 18px;
-  min-width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #ffffff !important;
+  background: #001e28;
+  font-size: 11px !important;
+  font-weight: 900;
+}
+
+.footer-bottom {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 24px;
+  align-items: center;
+  min-height: 74px;
+  padding: 16px 18px;
+  border-top: 1px solid #e6ecef;
+  color: #6d7a80;
+}
+
+.lite-link {
+  color: #001e28 !important;
+  text-decoration: underline;
 }
 
 @media (max-width: 1120px) {
@@ -983,6 +1048,15 @@ h1 {
   .favorite-page-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .sports-bar {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .footer-link-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px;
+  }
 }
 
 @media (max-width: 780px) {
@@ -1002,9 +1076,34 @@ h1 {
   }
 
   .main-links,
-  .sports-bar,
   .tabs-row {
     overflow-x: auto;
+  }
+
+  .sports-bar {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  .sport-btn {
+    flex: 0 0 50%;
+    max-width: 50%;
+    min-width: 0;
+    min-height: 54px;
+    flex-direction: column;
+    gap: 4px;
+    padding: 7px 4px;
+    border-top: 1px solid rgba(213, 221, 226, 0.78);
+    font-size: 10px;
+    line-height: 1.1;
+    white-space: normal;
+  }
+
+  .sport-btn::before {
+    height: 2px;
   }
 
   .hero-banner {
@@ -1061,7 +1160,23 @@ h1 {
     grid-template-columns: 1fr;
   }
 
-  .footer-columns {
-    grid-template-columns: 1fr 1fr;
+  .footer-link-grid,
+  .footer-meta,
+  .footer-bottom {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  .footer-link-grid {
+    padding: 24px 16px;
+  }
+
+  .footer-meta {
+    padding: 24px 16px;
+  }
+
+  .footer-bottom {
+    align-items: start;
+    padding: 16px;
   }
 }
