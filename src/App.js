@@ -9,7 +9,7 @@ const SPORTS = [
   {
     id: "football",
     label: "Football",
-    icon: "⚽",
+    icon: "FOOT",
     newsPath: "soccer/eng.1",
     leagues: [
       league("fifa.world", "Coupe du monde", "Monde", "un", "soccer/fifa.world", true),
@@ -29,7 +29,7 @@ const SPORTS = [
   {
     id: "basketball",
     label: "Basket",
-    icon: "🏀",
+    icon: "BASK",
     newsPath: "basketball/nba",
     leagues: [
       league("nba", "NBA", "USA", "us", "basketball/nba", true),
@@ -41,7 +41,7 @@ const SPORTS = [
   {
     id: "american-football",
     label: "Football Am.",
-    icon: "🏈",
+    icon: "NFL",
     newsPath: "football/nfl",
     leagues: [
       league("nfl", "NFL", "USA", "us", "football/nfl", true),
@@ -51,7 +51,7 @@ const SPORTS = [
   {
     id: "baseball",
     label: "Baseball",
-    icon: "⚾",
+    icon: "MLB",
     newsPath: "baseball/mlb",
     leagues: [
       league("mlb", "MLB", "USA", "us", "baseball/mlb", true),
@@ -61,7 +61,7 @@ const SPORTS = [
   {
     id: "hockey",
     label: "Hockey",
-    icon: "🏒",
+    icon: "NHL",
     newsPath: "hockey/nhl",
     leagues: [league("nhl", "NHL", "Canada/USA", "ca", "hockey/nhl", true)],
   },
@@ -106,6 +106,15 @@ function wc(date, home, homeFlag, away, awayFlag, time) {
   };
 }
 
+function readRoute() {
+  const clean = window.location.hash.replace(/^#\/?/, "");
+  const [view = "scores", ...rest] = clean.split("/");
+  return {
+    view: ["scores", "news", "article", "favorites"].includes(view) ? view : "scores",
+    id: decodeURIComponent(rest.join("/") || ""),
+  };
+}
+
 function flagUrl(code) {
   return code === "un" ? "https://flagcdn.com/w40/un.png" : `https://flagcdn.com/w40/${code}.png`;
 }
@@ -118,8 +127,8 @@ function espnDate(date) {
   return date.split("-").join("");
 }
 
-function scoreboardUrl(league, date) {
-  return `${ESPN_BASE}/${league.path}/scoreboard?dates=${espnDate(date)}`;
+function scoreboardUrl(item, date) {
+  return `${ESPN_BASE}/${item.path}/scoreboard?dates=${espnDate(date)}`;
 }
 
 function newsUrl(sport) {
@@ -137,20 +146,20 @@ function normalizeTeam(competitor) {
   };
 }
 
-function normalizeEvent(event, league) {
+function normalizeEvent(event, item) {
   const competition = event.competitions?.[0] || {};
   const competitors = competition.competitors || [];
-  const home = competitors.find((item) => item.homeAway === "home") || competitors[1] || {};
-  const away = competitors.find((item) => item.homeAway === "away") || competitors[0] || {};
+  const home = competitors.find((entry) => entry.homeAway === "home") || competitors[1] || {};
+  const away = competitors.find((entry) => entry.homeAway === "away") || competitors[0] || {};
   const statusType = event.status?.type || {};
   return {
-    id: `${league.id}-${event.id}`,
+    id: `${item.id}-${event.id}`,
     date: (event.date || "").slice(0, 10),
     status: statusType.shortDetail || statusType.detail || "A venir",
     state: statusType.state || "pre",
     source: "ESPN",
     venue: competition.venue?.fullName || "",
-    competition: league,
+    competition: item,
     home: normalizeTeam(home),
     away: normalizeTeam(away),
   };
@@ -173,17 +182,29 @@ async function fetchJson(url) {
 }
 
 function App() {
+  const [route, setRoute] = useState(() => readRoute());
   const [sportId, setSportId] = useState("football");
   const [date, setDate] = useState("2026-06-25");
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
   const [matches, setMatches] = useState([]);
   const [news, setNews] = useState([]);
   const [loadingLabel, setLoadingLabel] = useState("Chargement des matches ESPN...");
   const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem("footlive:favorites") || "[]"));
   const [selectedMatch, setSelectedMatch] = useState(null);
-  const [selectedNews, setSelectedNews] = useState(null);
   const sport = SPORTS.find((item) => item.id === sportId) || SPORTS[0];
+
+  const navigate = (view, id = "") => {
+    window.location.hash = id ? `#/${view}/${encodeURIComponent(id)}` : `#/${view}`;
+    setRoute({ view, id });
+  };
+
+  useEffect(() => {
+    const onHashChange = () => setRoute(readRoute());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -198,14 +219,12 @@ function App() {
       );
       const espnMatches = settled.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
       const worldCup = sport.id === "football" ? WORLD_CUP_FIXTURES.filter((match) => match.date === date) : [];
-
       let nextNews = [];
       try {
         nextNews = normalizeNews(await fetchJson(newsUrl(sport)));
       } catch {
         nextNews = fallbackNews(sport);
       }
-
       if (!cancelled) {
         const failed = settled.filter((result) => result.status === "rejected").length;
         setMatches([...worldCup, ...espnMatches]);
@@ -217,7 +236,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [sportId, date]);
+  }, [sportId, date, refreshKey]);
 
   useEffect(() => {
     localStorage.setItem("footlive:favorites", JSON.stringify(favorites));
@@ -238,65 +257,106 @@ function App() {
   }, [matches, query, filter]);
 
   const favoriteMatches = matches.filter((match) => favorites.includes(match.id));
+  const currentArticle = news.find((item) => item.id === route.id) || news[0] || fallbackNews(sport)[0];
   const toggleFavorite = (id) => setFavorites((items) => (items.includes(id) ? items.filter((item) => item !== id) : [...items, id]));
+  const changeSport = (id) => {
+    setSportId(id);
+    setFilter("all");
+    setQuery("");
+    navigate("scores");
+  };
+  const selectSearch = (term) => {
+    setQuery(term);
+    navigate("scores");
+  };
 
   return html`
     <div className="app">
-      <${Topbar} query=${query} setQuery=${setQuery} />
-      <${SportsBar} sportId=${sportId} setSportId=${(id) => { setSportId(id); setFilter("all"); setQuery(""); }} />
-      <main className="page-grid">
-        <${LeftPanel} sport=${sport} matches=${matches} favorites=${favoriteMatches} openMatch=${setSelectedMatch} />
-        <section className="center-panel">
-          <${ScoreToolbar} sport=${sport} date=${date} setDate=${setDate} />
-          <${FilterTabs} filter=${filter} setFilter=${setFilter} />
-          <${WorldCupStrip} sportId=${sportId} date=${date} />
-          <div className="status-line"><span>${loadingLabel}</span><button type="button" onClick=${() => setDate(`${date}`)}>Actualiser</button></div>
-          <${Scoreboard} matches=${visibleMatches} favorites=${favorites} toggleFavorite=${toggleFavorite} openMatch=${setSelectedMatch} />
-        </section>
-        <${RightPanel} sport=${sport} news=${news} matches=${matches} openNews=${setSelectedNews} />
-      </main>
+      <${TopAnnouncement} />
+      <${Topbar} query=${query} setQuery=${setQuery} route=${route} navigate=${navigate} />
+      <${HeroBanner} sport=${sport} matches=${matches} navigate=${navigate} />
+      <${SportsBar} sportId=${sportId} setSportId=${changeSport} />
+      ${route.view === "news" && html`<${NewsPage} sport=${sport} news=${news} navigate=${navigate} />`}
+      ${route.view === "article" && html`<${ArticlePage} article=${currentArticle} sport=${sport} navigate=${navigate} />`}
+      ${route.view === "favorites" && html`<${FavoritesPage} favorites=${favoriteMatches} navigate=${navigate} openMatch=${setSelectedMatch} />`}
+      ${route.view === "scores" && html`
+        <main className="page-grid">
+          <${LeftPanel} sport=${sport} matches=${matches} favorites=${favoriteMatches} openMatch=${setSelectedMatch} selectSearch=${selectSearch} />
+          <section className="center-panel">
+            <${ScoreToolbar} sport=${sport} date=${date} setDate=${setDate} />
+            <${FilterTabs} filter=${filter} setFilter=${setFilter} />
+            <${WorldCupStrip} sportId=${sportId} date=${date} />
+            <div className="status-line"><span>${loadingLabel}</span><button className="liquid-button dark" type="button" onClick=${() => setRefreshKey((value) => value + 1)}>Actualiser</button></div>
+            <${Scoreboard} matches=${visibleMatches} favorites=${favorites} toggleFavorite=${toggleFavorite} openMatch=${setSelectedMatch} />
+          </section>
+          <${RightPanel} sport=${sport} news=${news} matches=${matches} openNews=${(item) => navigate("article", item.id)} navigate=${navigate} selectSearch=${selectSearch} />
+        </main>
+      `}
+      <${Footer} navigate=${navigate} />
       ${selectedMatch && html`<${MatchModal} match=${selectedMatch} onClose=${() => setSelectedMatch(null)} />`}
-      ${selectedNews && html`<${NewsModal} item=${selectedNews} onClose=${() => setSelectedNews(null)} />`}
     </div>
   `;
 }
 
-function Topbar({ query, setQuery }) {
+function TopAnnouncement() {
+  return html`<div className="announcement"><strong>Foot Live Pro</strong><span>Scores multi-sports, Coupe du monde 2026, actualites internes et interface sans compte client.</span></div>`;
+}
+
+function Topbar({ query, setQuery, route, navigate }) {
   return html`
     <header className="topbar">
-      <a className="brand" href="./" aria-label="Foot Live accueil">
+      <button className="brand brand-button" type="button" onClick=${() => navigate("scores")} aria-label="Foot Live accueil">
         <span className="brand-mark">FL</span>
         <span><strong>Foot Live</strong><small>Scores, calendriers, actus</small></span>
-      </a>
+      </button>
       <nav className="main-links" aria-label="Navigation principale">
-        <button className="main-link active">Resultats</button>
-        <button className="main-link">Actualites</button>
-        <button className="main-link">Favoris</button>
+        <button className=${`main-link liquid-button ${route.view === "scores" ? "active" : ""}`} onClick=${() => navigate("scores")}>Resultats</button>
+        <button className=${`main-link liquid-button ${route.view === "news" || route.view === "article" ? "active" : ""}`} onClick=${() => navigate("news")}>Actualites</button>
+        <button className=${`main-link liquid-button ${route.view === "favorites" ? "active" : ""}`} onClick=${() => navigate("favorites")}>Favoris</button>
       </nav>
-      <label className="search"><span>⌕</span><input value=${query} onInput=${(event) => setQuery(event.target.value)} type="search" placeholder="Rechercher equipe, pays, competition" /></label>
+      <label className="search"><span>Search</span><input value=${query} onInput=${(event) => setQuery(event.target.value)} type="search" placeholder="Rechercher equipe, pays, competition" /></label>
     </header>
+  `;
+}
+
+function HeroBanner({ sport, matches, navigate }) {
+  const live = matches.filter((match) => match.state === "in").length;
+  const scheduled = matches.filter((match) => match.state !== "in" && match.state !== "post").length;
+  return html`
+    <section className="hero-banner">
+      <div className="hero-copy">
+        <p className="eyebrow">Interface livescore premium</p>
+        <h1>Scores propres, actus internes, competitions ordonnees.</h1>
+        <p>Tableau de bord sportif React inspire de la structure Flashscore, avec une vraie page actualites et des controles utiles.</p>
+        <div className="hero-actions">
+          <button className="liquid-button active" onClick=${() => navigate("scores")}>Voir les scores</button>
+          <button className="liquid-button ghost" onClick=${() => navigate("news")}>Lire les actualites</button>
+        </div>
+      </div>
+      <div className="hero-card"><span>${sport.label}</span><strong>${matches.length}</strong><small>${live} live / ${scheduled} a venir</small></div>
+    </section>
   `;
 }
 
 function SportsBar({ sportId, setSportId }) {
   return html`<nav className="sports-bar" aria-label="Sports">
-    ${SPORTS.map((sport) => html`<button key=${sport.id} className=${`sport-btn ${sport.id === sportId ? "active" : ""}`} onClick=${() => setSportId(sport.id)}><span>${sport.icon}</span>${sport.label}</button>`)}
+    ${SPORTS.map((sport) => html`<button key=${sport.id} className=${`sport-btn liquid-button ${sport.id === sportId ? "active" : ""}`} onClick=${() => setSportId(sport.id)}><span>${sport.icon}</span>${sport.label}</button>`)}
   </nav>`;
 }
 
-function LeftPanel({ sport, matches, favorites, openMatch }) {
+function LeftPanel({ sport, matches, favorites, openMatch, selectSearch }) {
   const countries = [...new Map(sport.leagues.map((item) => [item.country, item])).values()];
   return html`
     <aside className="left-panel">
-      <section className="panel"><h2>Ligues epinglees</h2><div className="stack">${sport.leagues.filter((item) => item.pinned).map((item) => html`<${LeagueButton} key=${item.id} league=${item} count=${countForLeague(matches, item.id)} />`)}</div></section>
+      <section className="panel"><h2>Ligues epinglees</h2><div className="stack">${sport.leagues.filter((item) => item.pinned).map((item) => html`<${LeagueButton} key=${item.id} league=${item} count=${countForLeague(matches, item.id)} onClick=${() => selectSearch(item.label)} />`)}</div></section>
       <section className="panel"><h2>Mes equipes</h2>${favorites.length ? html`<div className="stack">${favorites.map((match) => html`<button className="favorite-row" onClick=${() => openMatch(match)}><strong>${match.away.name} - ${match.home.name}</strong><span>${match.status}</span></button>`)}</div>` : html`<p className="muted">Clique sur une etoile pour ajouter un match.</p>`}</section>
-      <section className="panel standings-panel"><h2>Classements</h2><div className="country-list">${countries.map((item) => html`<button className="country-link"><span className="country-main"><${Flag} code=${item.flag} /><strong>${item.country}</strong></span><span className="count-pill">${sport.leagues.filter((league) => league.country === item.country).length}</span></button>`)}</div></section>
+      <section className="panel standings-panel"><h2>Classements</h2><div className="country-list">${countries.map((item) => html`<button className="country-link" onClick=${() => selectSearch(item.country)}><span className="country-main"><${Flag} code=${item.flag} /><strong>${item.country}</strong></span><span className="count-pill">${sport.leagues.filter((league) => league.country === item.country).length}</span></button>`)}</div></section>
     </aside>
   `;
 }
 
-function LeagueButton({ league, count }) {
-  return html`<button className="league-link"><span className="league-main"><${Flag} code=${league.flag} /><span><strong>${league.label}</strong><br /><small>${league.country}</small></span></span><span className="count-pill">${count}</span></button>`;
+function LeagueButton({ league, count, onClick }) {
+  return html`<button className="league-link" onClick=${onClick}><span className="league-main"><${Flag} code=${league.flag} /><span><strong>${league.label}</strong><br /><small>${league.country}</small></span></span><span className="count-pill">${count}</span></button>`;
 }
 
 function ScoreToolbar({ sport, date, setDate }) {
@@ -305,11 +365,11 @@ function ScoreToolbar({ sport, date, setDate }) {
     current.setDate(current.getDate() + days);
     setDate(current.toISOString().slice(0, 10));
   };
-  return html`<div className="score-toolbar"><div><p className="eyebrow">${sport.label}</p><h1>${sport.id === "football" ? "Resultats foot en direct" : `${sport.label} en direct`}</h1></div><div className="date-controls"><button onClick=${() => shiftDate(-1)} type="button">‹</button><input value=${date} onChange=${(event) => setDate(event.target.value)} type="date" /><button onClick=${() => shiftDate(1)} type="button">›</button></div></div>`;
+  return html`<div className="score-toolbar"><div><p className="eyebrow">${sport.label}</p><h1>${sport.id === "football" ? "Resultats foot en direct" : `${sport.label} en direct`}</h1></div><div className="date-controls"><button className="liquid-button" onClick=${() => shiftDate(-1)} type="button">Prev</button><input value=${date} onChange=${(event) => setDate(event.target.value)} type="date" /><button className="liquid-button" onClick=${() => shiftDate(1)} type="button">Next</button></div></div>`;
 }
 
 function FilterTabs({ filter, setFilter }) {
-  return html`<div className="tabs-row">${["all", "live", "finished", "scheduled"].map((id) => html`<button className=${`tab ${filter === id ? "active" : ""}`} onClick=${() => setFilter(id)}>${{ all: "Tous", live: "Live", finished: "Termines", scheduled: "A venir" }[id]}</button>`)}</div>`;
+  return html`<div className="tabs-row">${["all", "live", "finished", "scheduled"].map((id) => html`<button className=${`tab liquid-button ${filter === id ? "active" : ""}`} onClick=${() => setFilter(id)}>${{ all: "Tous", live: "Live", finished: "Termines", scheduled: "A venir" }[id]}</button>`)}</div>`;
 }
 
 function WorldCupStrip({ sportId, date }) {
@@ -325,7 +385,7 @@ function Scoreboard({ matches, favorites, toggleFavorite, openMatch }) {
 }
 
 function MatchRow({ match, favorite, toggleFavorite, openMatch }) {
-  return html`<div className="match-row"><button className=${`star-btn ${favorite ? "active" : ""}`} onClick=${() => toggleFavorite(match.id)}>★</button><span className=${`time-cell ${match.state === "in" ? "live" : ""}`}>${match.state === "in" ? "LIVE" : match.status}</span><${TeamCell} team=${match.away} /><span className=${`score ${match.away.winner ? "winner" : ""}`}>${match.away.score}</span><span className=${`score ${match.home.winner ? "winner" : ""}`}>${match.home.score}</span><${TeamCell} team=${match.home} side="right" /><button className="open-btn" onClick=${() => openMatch(match)}>›</button></div>`;
+  return html`<div className="match-row"><button className=${`star-btn ${favorite ? "active" : ""}`} onClick=${() => toggleFavorite(match.id)}>*</button><span className=${`time-cell ${match.state === "in" ? "live" : ""}`}>${match.state === "in" ? "LIVE" : match.status}</span><${TeamCell} team=${match.away} /><span className=${`score ${match.away.winner ? "winner" : ""}`}>${match.away.score}</span><span className=${`score ${match.home.winner ? "winner" : ""}`}>${match.home.score}</span><${TeamCell} team=${match.home} side="right" /><button className="open-btn" onClick=${() => openMatch(match)}>Open</button></div>`;
 }
 
 function TeamCell({ team, side = "" }) {
@@ -333,16 +393,28 @@ function TeamCell({ team, side = "" }) {
   return html`<span className=${`team-cell ${side}`}>${img && html`<img className="team-logo" src=${img} alt="" loading="lazy" />`}<span className="team-name">${team.name}</span></span>`;
 }
 
-function RightPanel({ sport, news, matches, openNews }) {
-  return html`<aside className="right-panel"><section className="panel news-panel"><div className="panel-heading-row"><h2>Actualites</h2><span>Dans le site</span></div><div className="news-list">${news.map((item) => html`<button className="news-card" onClick=${() => openNews(item)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="team-logo"></div>`}<span><strong>${item.title}</strong><small>${item.description || "Lire dans Foot Live"}</small></span></button>`)}</div></section><section className="panel"><h2>Top competitions</h2><div className="stack">${sport.leagues.slice(0, 8).map((item) => html`<button className="top-row"><span className="top-main"><${Flag} code=${item.flag} /><strong>${item.label}</strong></span><span className="count-pill">${countForLeague(matches, item.id)}</span></button>`)}</div></section></aside>`;
+function RightPanel({ sport, news, matches, openNews, navigate, selectSearch }) {
+  return html`<aside className="right-panel"><section className="panel news-panel"><div className="panel-heading-row"><h2>Actualites</h2><button className="panel-link" onClick=${() => navigate("news")}>Tout voir</button></div><div className="news-list">${news.slice(0, 5).map((item) => html`<button className="news-card" onClick=${() => openNews(item)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="team-logo"></div>`}<span><strong>${item.title}</strong><small>${item.description || "Lire dans Foot Live"}</small></span></button>`)}</div></section><section className="panel"><h2>Top competitions</h2><div className="stack">${sport.leagues.slice(0, 8).map((item) => html`<button className="top-row" onClick=${() => selectSearch(item.label)}><span className="top-main"><${Flag} code=${item.flag} /><strong>${item.label}</strong></span><span className="count-pill">${countForLeague(matches, item.id)}</span></button>`)}</div></section></aside>`;
+}
+
+function NewsPage({ sport, news, navigate }) {
+  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">${sport.label}</p><h1>Actualites sportives</h1><p>Articles consultables directement dans Foot Live, sans ouvrir ESPN dans un onglet externe.</p></section><div className="news-grid">${news.map((item) => html`<button className="article-card" key=${item.id} onClick=${() => navigate("article", item.id)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="article-fallback">FL</div>`}<span><small>${sport.label}</small><strong>${item.title}</strong><p>${item.description || "Lire l'article complet dans le site."}</p></span></button>`)}</div></main>`;
+}
+
+function ArticlePage({ article, sport, navigate }) {
+  return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualites</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualite</p><h1>${article.title}</h1>${article.image && html`<img className="article-hero" src=${article.image} alt="" />`}<p className="article-lead">${article.description || ""}</p><p>${article.body || article.description || "Article affiche directement dans Foot Live."}</p></article></main>`;
+}
+
+function FavoritesPage({ favorites, navigate, openMatch }) {
+  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">Favoris</p><h1>Mes matchs suivis</h1><p>Les favoris restent dans le navigateur, sans connexion client.</p></section>${favorites.length ? html`<div className="favorite-page-grid">${favorites.map((match) => html`<button className="favorite-large-card" onClick=${() => openMatch(match)}><span>${match.competition.label}</span><strong>${match.away.name} - ${match.home.name}</strong><small>${match.status}</small></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucun favori</h2><p>Retourne aux scores et clique sur une etoile pour ajouter un match.</p><button className="liquid-button active" onClick=${() => navigate("scores")}>Voir les scores</button></div>`}</main>`;
 }
 
 function MatchModal({ match, onClose }) {
-  return html`<div className="modal-backdrop"><div className="dialog dialog-open"><div className="dialog-card"><div className="dialog-top"><div><p className="eyebrow">${match.competition.country}: ${match.competition.label}</p><h2>${match.away.name} - ${match.home.name}</h2></div><button className="close-dialog" onClick=${onClose}>×</button></div><div className="dialog-score"><div className="dialog-team"><${TeamCell} team=${match.away} /><span>${match.away.name}</span></div><div className="dialog-total">${match.away.score} - ${match.home.score}</div><div className="dialog-team"><${TeamCell} team=${match.home} /><span>${match.home.name}</span></div></div><p><strong>Statut:</strong> ${match.status}</p><p><strong>Source:</strong> ${match.source}</p><p><strong>Lieu:</strong> ${match.venue || "Non renseigne"}</p></div></div></div>`;
+  return html`<div className="modal-backdrop"><div className="dialog dialog-open"><div className="dialog-card"><div className="dialog-top"><div><p className="eyebrow">${match.competition.country}: ${match.competition.label}</p><h2>${match.away.name} - ${match.home.name}</h2></div><button className="close-dialog" onClick=${onClose}>x</button></div><div className="dialog-score"><div className="dialog-team"><${TeamCell} team=${match.away} /><span>${match.away.name}</span></div><div className="dialog-total">${match.away.score} - ${match.home.score}</div><div className="dialog-team"><${TeamCell} team=${match.home} /><span>${match.home.name}</span></div></div><p><strong>Statut:</strong> ${match.status}</p><p><strong>Source:</strong> ${match.source}</p><p><strong>Lieu:</strong> ${match.venue || "Non renseigne"}</p></div></div></div>`;
 }
 
-function NewsModal({ item, onClose }) {
-  return html`<div className="modal-backdrop"><div className="dialog news-dialog dialog-open"><div className="dialog-card"><div className="dialog-top"><div><p className="eyebrow">Actualite interne</p><h2>${item.title}</h2></div><button className="close-dialog" onClick=${onClose}>×</button></div>${item.image && html`<img src=${item.image} alt="" />`}<p>${item.description || ""}</p><p>${item.body || item.description || "Article affiche directement dans Foot Live."}</p></div></div></div>`;
+function Footer({ navigate }) {
+  return html`<footer className="site-footer"><div><strong>Foot Live</strong><p>Livescore React, actus internes, drapeaux reels et interface ordonnee pour GitHub Pages.</p></div><nav><button onClick=${() => navigate("scores")}>Resultats</button><button onClick=${() => navigate("news")}>Actualites</button><button onClick=${() => navigate("favorites")}>Favoris</button></nav><span>ESPN data / FlagCDN flags / React UI</span></footer>`;
 }
 
 function countForLeague(matches, id) {
