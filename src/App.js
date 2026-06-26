@@ -156,9 +156,9 @@ function summaryUrl(match) {
   return `${ESPN_BASE}/${match.leaguePath}/summary?event=${match.eventId}`;
 }
 
-function previousDate(date) {
-  const current = new Date(`${date}T00:00:00`);
-  current.setDate(current.getDate() - 1);
+function addDaysISO(date, days) {
+  const [year, month, day] = date.split("-").map(Number);
+  const current = new Date(Date.UTC(year, month - 1, day + days));
   return current.toISOString().slice(0, 10);
 }
 
@@ -333,9 +333,8 @@ function App() {
       }
       const settled = await Promise.allSettled(
         sport.leagues.map(async (item) => {
-          const dates = item.id === "fifa.world" ? [previousDate(date), date] : [date];
-          const payloads = await Promise.allSettled(dates.map((value) => fetchJson(scoreboardUrl(item, value))));
-          return payloads.flatMap((result) => (result.status === "fulfilled" ? (result.value.events || []).map((event) => normalizeEvent(event, item)) : []));
+          const payload = await fetchJson(scoreboardUrl(item, date));
+          return (payload.events || []).map((event) => normalizeEvent(event, item));
         }),
       );
       const espnMatches = uniqueMatches(settled.flatMap((result) => (result.status === "fulfilled" ? result.value : [])));
@@ -507,9 +506,7 @@ function LeagueButton({ league, count, onClick }) {
 
 function ScoreHeader({ filter, setFilter, date, setDate }) {
   const shiftDate = (days) => {
-    const current = new Date(`${date}T00:00:00`);
-    current.setDate(current.getDate() + days);
-    setDate(current.toISOString().slice(0, 10));
+    setDate(addDaysISO(date, days));
   };
   const label = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", weekday: "short" }).format(new Date(`${date}T12:00:00`)).replace(".", "");
   const tabs = [
@@ -588,6 +585,115 @@ function FavoritesPage({ favorites, navigate, openMatch }) {
   return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">Favoris</p><h1>Mes matchs suivis</h1><p>Les favoris restent dans le navigateur, sans connexion client.</p></section>${favorites.length ? html`<div className="favorite-page-grid">${favorites.map((match) => html`<button className="favorite-large-card" onClick=${() => openMatch(match)}><span>${match.competition.label}</span><strong>${match.away.name} - ${match.home.name}</strong><small>${match.status}</small></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucun favori</h2><p>Retourne aux scores et clique sur une étoile pour ajouter un match.</p><button className="liquid-button active" onClick=${() => navigate("scores")}>Voir les scores</button></div>`}</main>`;
 }
 
+function athleteName(participant) {
+  return participant?.athlete?.displayName || participant?.displayName || "";
+}
+
+function normalizeLooseName(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function goalScoreFromText(text, homeName, awayName) {
+  const match = String(text || "").match(/Goal!\s*([^,]+?)\s+(\d+),\s*([^\.]+?)\s+(\d+)\./i);
+  if (!match) return null;
+  const first = normalizeLooseName(match[1]);
+  const second = normalizeLooseName(match[3]);
+  const home = normalizeLooseName(homeName);
+  const away = normalizeLooseName(awayName);
+  if (first.includes(home) || home.includes(first)) return { home: Number(match[2]), away: Number(match[4]) };
+  if (first.includes(away) || away.includes(first)) return { home: Number(match[4]), away: Number(match[2]) };
+  if (second.includes(home) || home.includes(second)) return { home: Number(match[4]), away: Number(match[2]) };
+  return { home: Number(match[2]), away: Number(match[4]) };
+}
+
+function eventKind(event) {
+  const type = event?.type?.type || "";
+  if (type.includes("goal")) return "goal";
+  if (type.includes("yellow")) return "yellow";
+  if (type.includes("red")) return "red";
+  if (type.includes("substitution")) return "sub";
+  return "";
+}
+
+function summaryEventTitle(event) {
+  const kind = eventKind(event);
+  const first = athleteName(event.participants?.[0]);
+  const second = athleteName(event.participants?.[1]);
+  if (kind === "sub") return first || event.shortText || "Remplacement";
+  if (kind === "goal") return first || event.shortText || "But";
+  if (kind === "yellow") return first || event.shortText || "Carton jaune";
+  if (kind === "red") return first || event.shortText || "Carton rouge";
+  return event.shortText || event.text || "Événement";
+}
+
+function summaryEventMeta(event) {
+  const kind = eventKind(event);
+  const second = athleteName(event.participants?.[1]);
+  if (kind === "sub" && second) return second;
+  if (kind === "goal" && second) return `(${second})`;
+  if (kind === "yellow") return "(Carton jaune)";
+  if (kind === "red") return "(Carton rouge)";
+  return "";
+}
+
+function buildTimeline(events, homeName, awayName) {
+  const score = { home: 0, away: 0 };
+  return (events || [])
+    .filter((event) => eventKind(event))
+    .sort((a, b) => ((a.period?.number || 0) - (b.period?.number || 0)) || ((a.clock?.value || 0) - (b.clock?.value || 0)))
+    .map((event) => {
+      const kind = eventKind(event);
+      if (kind === "goal") {
+        const parsed = goalScoreFromText(event.text, homeName, awayName);
+        if (parsed) {
+          score.home = parsed.home;
+          score.away = parsed.away;
+        }
+      }
+      return {
+        event,
+        kind,
+        side: normalizeLooseName(event.team?.displayName) === normalizeLooseName(homeName) ? "home" : "away",
+        period: event.period?.number || 1,
+        score: { ...score },
+      };
+    });
+}
+
+function SummaryTimeline({ events, homeName, awayName, comments }) {
+  const rows = buildTimeline(events, homeName, awayName);
+  const periods = [1, 2].filter((period) => rows.some((row) => row.period === period) || period === 1);
+  if (!rows.length) return html`<section className="match-section summary-card"><p className="muted">Aucun événement clé ESPN chargé.</p></section>`;
+  const periodScore = (period) => {
+    const last = [...rows].reverse().find((row) => row.period <= period);
+    return `${last?.score.home || 0} - ${last?.score.away || 0}`;
+  };
+  return html`
+    <section className="match-section summary-card">
+      ${periods.map((period) => html`
+        <div className="period-row"><strong>${period}. MI-TEMPS</strong><span>${periodScore(period)}</span></div>
+        <div className="timeline-block">
+          ${rows.filter((row) => row.period === period).map((row) => html`<${SummaryEventRow} key=${row.event.id} row=${row} />`)}
+        </div>
+      `)}
+      <div className="period-row comments-title"><strong>COMMENTAIRES</strong></div>
+      <div className="summary-comments">${comments.slice(0, 3).map((item) => html`<p><strong>${item.time?.displayValue || item.clock?.displayValue || ""}</strong>${translateText(item.text)}</p>`)}</div>
+    </section>
+  `;
+}
+
+function SummaryEventRow({ row }) {
+  const { event, kind, side, score } = row;
+  return html`
+    <div className=${`summary-event ${side}-event`}>
+      <span className="summary-minute">${event.clock?.displayValue || ""}</span>
+      ${kind === "goal" && html`<span className="summary-score">${score.home} - ${score.away}</span>`}
+      <span className=${`summary-icon ${kind}`}>${kind === "goal" ? "⚽" : kind === "sub" ? "↻" : ""}</span>
+      <p><strong>${summaryEventTitle(event)}</strong>${summaryEventMeta(event) && html` <span>${summaryEventMeta(event)}</span>`}</p>
+    </div>
+  `;
+}
+
 function MatchPage({ match, navigate }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState("");
@@ -630,7 +736,7 @@ function MatchPage({ match, navigate }) {
   const awayScore = awaySummary?.score ?? match.away.score;
   const status = translateStatus(summary?.header?.competitions?.[0]?.status?.type?.shortDetail || match.status);
   const commentary = (summary?.commentary || []).slice(-8).reverse();
-  const keyEvents = (summary?.keyEvents || []).filter((item) => item.text).slice(-6).reverse();
+  const keyEvents = summary?.keyEvents || [];
   const odds = summary?.odds?.[0] || null;
   const stats = summary?.boxscore?.teams || [];
   const homeStats = stats.find((item) => item.team?.displayName === match.home.name)?.statistics || [];
@@ -658,14 +764,14 @@ function MatchPage({ match, navigate }) {
       <div className="match-breadcrumb"><button onClick=${() => navigate("scores")} type="button">Football</button><span>${"\u203a"}</span><span>${match.competition.country}</span><span>${"\u203a"}</span><strong>${match.competition.label}</strong><button className="new-window-btn" type="button">Nouvelle fenêtre</button></div>
       <section className="match-hero">
         <button className="star-btn" type="button">☆</button>
-        <div className="match-team-card"><${TeamBadge} team=${match.away} /><strong>${match.away.name}</strong><span>${match.away.code || ""}</span></div>
-        <div className="match-score-card"><span>${formatMatchDate(match.date)}</span><strong>${awayScore} - ${homeScore}</strong><small>${status}</small><p>${loading}</p></div>
         <div className="match-team-card"><${TeamBadge} team=${match.home} /><strong>${match.home.name}</strong><span>${match.home.code || ""}</span></div>
+        <div className="match-score-card"><span>${formatMatchDate(match.date)}</span><strong>${homeScore} - ${awayScore}</strong><small>${status}</small><p>${loading}</p></div>
+        <div className="match-team-card"><${TeamBadge} team=${match.away} /><strong>${match.away.name}</strong><span>${match.away.code || ""}</span></div>
         <button className="star-btn" type="button">☆</button>
       </section>
       <nav className="match-tabs">${mainTabs.map(([id, label]) => html`<button className=${mainTab === id ? "active" : ""} onClick=${() => setMainTab(id)} type="button">${label}</button>`)}</nav>
       ${mainTab === "match" && html`<div className="match-subtabs">${subTabs.map(([id, label]) => html`<button className=${subTab === id ? "active" : ""} onClick=${() => setSubTab(id)} type="button">${label}</button>`)}</div>`}
-      ${mainTab === "match" && subTab === "summary" && html`<section className="match-section"><h3>Résumé ESPN</h3>${keyEvents.length ? keyEvents.map((item) => html`<div className="event-line"><span>${item.clock?.displayValue || ""}</span><p>${translateText(item.text)}</p></div>`) : html`<p className="muted">Aucun événement clé ESPN chargé.</p>`}</section>`}
+      ${mainTab === "match" && subTab === "summary" && html`<${SummaryTimeline} events=${keyEvents} homeName=${match.home.name} awayName=${match.away.name} comments=${commentary} />`}
       ${mainTab === "match" && subTab === "stats" && html`<section className="match-section"><h3>Stats ESPN</h3><${StatsTable} home=${homeStats} away=${awayStats} homeName=${match.home.name} awayName=${match.away.name} /></section>`}
       ${mainTab === "match" && subTab === "lineups" && html`<section className="match-section"><h3>Compositions ESPN</h3><${RosterList} rosters=${rosters} /></section>`}
       ${mainTab === "match" && subTab === "players" && html`<section className="match-section"><h3>Stats joueurs ESPN</h3><${LeadersList} leaders=${leaders} /></section>`}

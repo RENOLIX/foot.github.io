@@ -1176,6 +1176,142 @@ h1 {
   text-transform: uppercase;
 }
 
+.summary-card {
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.period-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  margin: 0 0 10px;
+  padding: 0 12px;
+  border-radius: 4px;
+  color: #34434b;
+  background: #eef0f2;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.period-row span {
+  color: #001e28;
+}
+
+.timeline-block {
+  display: grid;
+  gap: 6px;
+  padding: 6px 12px 14px;
+}
+
+.summary-event {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(52%, 360px);
+  min-height: 44px;
+  color: #001e28;
+}
+
+.summary-event.away-event {
+  margin-left: auto;
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.summary-minute {
+  min-width: 34px;
+  color: #001e28;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.summary-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 27px;
+  height: 27px;
+  border: 1px solid #e1e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.summary-icon.sub {
+  color: #0aaa64;
+}
+
+.summary-icon.yellow,
+.summary-icon.red {
+  width: 18px;
+  height: 24px;
+  border-radius: 5px;
+  border-color: transparent;
+  background: #ffc400;
+}
+
+.summary-icon.red {
+  background: #e41f35;
+}
+
+.summary-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #e1e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #001e28;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.summary-event p {
+  margin: 0;
+  min-width: 0;
+  color: #001e28;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.summary-event p strong {
+  font-weight: 900;
+}
+
+.summary-event p span {
+  color: #53616a;
+}
+
+.comments-title {
+  margin-top: 10px;
+}
+
+.summary-comments {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.summary-comments p {
+  margin: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid #edf0f2;
+  color: #001e28;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.summary-comments strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
 .event-line,
 .comment-line {
   display: grid;
