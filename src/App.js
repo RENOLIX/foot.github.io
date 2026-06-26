@@ -673,10 +673,15 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const key = new URLSearchParams(window.location.search).get("apisports");
+    const params = new URLSearchParams(window.location.search);
+    const key = params.get("apisports");
     if (key) {
       localStorage.setItem(API_SPORTS_KEY_STORAGE, key);
       setApiSportsKey(key);
+      params.delete("apisports");
+      const cleanQuery = params.toString();
+      const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${window.location.hash}`;
+      window.history.replaceState({}, "", cleanUrl);
     }
   }, []);
 
