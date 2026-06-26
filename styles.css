@@ -123,7 +123,6 @@ button {
 
 .brand small,
 .muted,
-.status-line,
 .panel-heading-row span,
 .site-footer span {
   color: var(--muted);
@@ -494,7 +493,6 @@ button {
 
 .panel-heading-row,
 .score-toolbar,
-.status-line,
 .world-title {
   display: flex;
   align-items: center;

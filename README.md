@@ -1,6 +1,6 @@
 # Foot Live
 
-Site React statique type livescore avec structure proche de Flashscore:
+Site React statique type livescore:
 
 - sports separes;
 - ligues par pays avec vrais drapeaux via FlagCDN;

@@ -769,8 +769,6 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [matches, setMatches] = useState([]);
   const [news, setNews] = useState([]);
-  const [loadingLabel, setLoadingLabel] = useState("");
-  const [lastUpdated, setLastUpdated] = useState("");
   const [apiSportsKey, setApiSportsKey] = useState(() => localStorage.getItem(API_SPORTS_KEY_STORAGE) || "");
   const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem("footlive:favorites") || "[]"));
   const sport = SPORTS.find((item) => item.id === sportId) || SPORTS[0];
@@ -806,12 +804,10 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      setLoadingLabel("");
       if (!sport.leagues.length) {
         if (!cancelled) {
           setMatches([]);
           setNews([]);
-          setLoadingLabel("");
         }
         return;
       }
@@ -828,12 +824,10 @@ function App() {
             const apiMatches = (payload.response || []).map(normalizeApiSportsFixture);
             setMatches(apiMatches);
             setNews(nextNews);
-            setLastUpdated(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-            setLoadingLabel("");
           }
           return;
         } catch {
-          if (!cancelled) setLoadingLabel("");
+          if (cancelled) return;
         }
       }
       const settled = await Promise.allSettled(
@@ -852,8 +846,6 @@ function App() {
       if (!cancelled) {
         setMatches(espnMatches);
         setNews(nextNews);
-        setLastUpdated(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-        setLoadingLabel("");
       }
     }
     load();
@@ -863,7 +855,7 @@ function App() {
   }, [sportId, date, refreshKey, apiSportsKey]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setRefreshKey((value) => value + 1), 60000);
+    const timer = window.setInterval(() => setRefreshKey((value) => value + 1), 15000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -924,7 +916,6 @@ function App() {
           <${LeftPanel} sport=${sport} matches=${matches} favorites=${favoriteMatches} openMatch=${openMatchPage} selectSearch=${selectSearch} />
           <section className="center-panel">
             <${ScoreHeader} filter=${filter} setFilter=${setFilter} date=${date} setDate=${setDate} />
-            <div className="status-line"><button className="liquid-button dark" type="button" onClick=${() => setRefreshKey((value) => value + 1)}>Actualiser</button></div>
             <${Scoreboard} matches=${visibleMatches} favorites=${favorites} toggleFavorite=${toggleFavorite} openMatch=${openMatchPage} />
           </section>
           <${RightPanel} sport=${sport} news=${news} matches=${matches} openNews=${(item) => navigate("article", item.id)} navigate=${navigate} selectSearch=${selectSearch} />
@@ -996,7 +987,7 @@ function FootballNewsStrip({ news, navigate }) {
   return html`
     <section className="football-news-strip">
       <div className="strip-heading">
-        <span>Flashscore Actualités</span>
+        <span>Actualités</span>
         <button type="button" onClick=${() => navigate("news")}>Toutes les actualités</button>
       </div>
       <div className="strip-news-row">
