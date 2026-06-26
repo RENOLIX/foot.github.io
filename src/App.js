@@ -4,6 +4,8 @@ import htm from "htm";
 
 const html = htm.bind(React.createElement);
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports";
+const API_SPORTS_BASE = "https://v3.football.api-sports.io";
+const API_SPORTS_KEY_STORAGE = "footlive:apiSportsKey";
 
 const SPORTS = [
   {
@@ -157,6 +159,8 @@ function readRoute() {
 }
 
 function flagUrl(code) {
+  if (!code) return "https://flagcdn.com/w40/un.png";
+  if (/^https?:\/\//i.test(code)) return code;
   return code === "un" ? "https://flagcdn.com/w40/un.png" : `https://flagcdn.com/w40/${code}.png`;
 }
 
@@ -438,6 +442,92 @@ async function fetchJson(url, timeoutMs = 9000) {
   }
 }
 
+async function fetchApiSports(path, apiKey, params = {}, timeoutMs = 14000) {
+  const url = new URL(`${API_SPORTS_BASE}${path}`);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, value);
+  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url.toString(), {
+      signal: controller.signal,
+      headers: { "x-apisports-key": apiKey },
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (payload.errors && Object.keys(payload.errors).length) throw new Error("API-SPORTS error");
+    return payload;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function translateApiLeagueName(name) {
+  const labels = {
+    "World Cup": "Coupe du monde",
+    "UEFA Champions League": "Ligue des Champions",
+    "UEFA Europa League": "Ligue Europa",
+    "UEFA Europa Conference League": "Ligue Conférence",
+  };
+  return labels[name] || name || "Compétition";
+}
+
+function apiSportsState(short) {
+  if (["1H", "2H", "ET", "BT", "P", "LIVE", "INT"].includes(short)) return "in";
+  if (["FT", "AET", "PEN"].includes(short)) return "post";
+  return "pre";
+}
+
+function apiSportsStatus(fixture) {
+  const status = fixture?.status || {};
+  if (apiSportsState(status.short) === "in") return status.elapsed ? `${status.elapsed}'` : status.long || "Live";
+  if (apiSportsState(status.short) === "post") return "Terminé";
+  return status.long || "À venir";
+}
+
+function normalizeApiSportsFixture(item) {
+  const fixture = item.fixture || {};
+  const leagueInfo = item.league || {};
+  const teams = item.teams || {};
+  const goals = item.goals || {};
+  const status = fixture.status || {};
+  return {
+    id: `api-football-${fixture.id}`,
+    eventId: fixture.id,
+    leaguePath: "",
+    date: (fixture.date || "").slice(0, 10),
+    kickTime: matchTime(fixture.date),
+    status: apiSportsStatus(fixture),
+    state: apiSportsState(status.short),
+    source: "API-SPORTS",
+    venue: fixture.venue?.name || "",
+    competition: {
+      id: `api-league-${leagueInfo.id}`,
+      label: translateApiLeagueName(leagueInfo.name),
+      country: leagueInfo.country || "Monde",
+      flag: leagueInfo.flag || leagueInfo.logo || "un",
+      path: "",
+      apiLeagueId: leagueInfo.id,
+      season: leagueInfo.season,
+    },
+    home: {
+      name: teams.home?.name || "Équipe domicile",
+      code: "",
+      logo: teams.home?.logo || "",
+      score: goals.home ?? "-",
+      winner: teams.home?.winner === true,
+    },
+    away: {
+      name: teams.away?.name || "Équipe extérieur",
+      code: "",
+      logo: teams.away?.logo || "",
+      score: goals.away ?? "-",
+      winner: teams.away?.winner === true,
+    },
+  };
+}
+
 async function fetchFullArticle(article) {
   if (!article?.apiUrl) return article;
   const payload = await fetchJson(article.apiUrl, 14000);
@@ -487,6 +577,7 @@ function App() {
   const [news, setNews] = useState([]);
   const [loadingLabel, setLoadingLabel] = useState("Chargement des matches ESPN...");
   const [lastUpdated, setLastUpdated] = useState("");
+  const [apiSportsKey, setApiSportsKey] = useState(() => localStorage.getItem(API_SPORTS_KEY_STORAGE) || "");
   const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem("footlive:favorites") || "[]"));
   const sport = SPORTS.find((item) => item.id === sportId) || SPORTS[0];
 
@@ -502,9 +593,21 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const key = new URLSearchParams(window.location.search).get("apisports");
+    if (key) {
+      localStorage.setItem(API_SPORTS_KEY_STORAGE, key);
+      setApiSportsKey(key);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (apiSportsKey) localStorage.setItem(API_SPORTS_KEY_STORAGE, apiSportsKey);
+  }, [apiSportsKey]);
+
+  useEffect(() => {
     let cancelled = false;
     async function load() {
-      setLoadingLabel("Chargement des matches ESPN...");
+      setLoadingLabel(sport.id === "football" && apiSportsKey ? "Chargement des matches API-SPORTS..." : "Chargement des matches ESPN...");
       if (!sport.leagues.length) {
         if (!cancelled) {
           setMatches([]);
@@ -512,6 +615,27 @@ function App() {
           setLoadingLabel(sport.unavailable || "Aucun flux ESPN configure pour ce sport.");
         }
         return;
+      }
+      if (sport.id === "football" && apiSportsKey) {
+        let nextNews = [];
+        try {
+          nextNews = normalizeNews(await fetchJson(newsUrl(sport)));
+        } catch {
+          nextNews = [];
+        }
+        try {
+          const payload = await fetchApiSports("/fixtures", apiSportsKey, { date, timezone: "Africa/Algiers" });
+          if (!cancelled) {
+            const apiMatches = (payload.response || []).map(normalizeApiSportsFixture);
+            setMatches(apiMatches);
+            setNews(nextNews);
+            setLastUpdated(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+            setLoadingLabel(`${apiMatches.length} match(s) API-SPORTS - tous pays/ligues disponibles`);
+          }
+          return;
+        } catch {
+          if (!cancelled) setLoadingLabel("API-SPORTS indisponible ou clé manquante. Fallback ESPN chargé.");
+        }
       }
       const settled = await Promise.allSettled(
         sport.leagues.map(async (item) => {
@@ -538,7 +662,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [sportId, date, refreshKey]);
+  }, [sportId, date, refreshKey, apiSportsKey]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setRefreshKey((value) => value + 1), 60000);
@@ -589,9 +713,10 @@ function App() {
       <${HeroBanner} sport=${sport} matches=${matches} navigate=${navigate} />
       <${SportsBar} navId=${navId} setSportId=${changeSport} />
       ${route.view === "scores" && sport.id === "football" && html`<${FootballNewsStrip} news=${news} navigate=${navigate} />`}
+      ${route.view === "scores" && sport.id === "football" && html`<${ApiSportsConfig} apiKey=${apiSportsKey} setApiKey=${setApiSportsKey} />`}
       ${route.view === "news" && html`<${NewsPage} sport=${sport} news=${news} navigate=${navigate} />`}
       ${route.view === "article" && html`<${ArticlePage} article=${currentArticle} sport=${sport} navigate=${navigate} />`}
-      ${route.view === "match" && html`<${MatchPage} match=${currentMatch} navigate=${navigate} />`}
+      ${route.view === "match" && html`<${MatchPage} match=${currentMatch} navigate=${navigate} apiSportsKey=${apiSportsKey} />`}
       ${route.view === "favorites" && html`<${FavoritesPage} favorites=${favoriteMatches} navigate=${navigate} openMatch=${openMatchPage} />`}
       ${route.view === "scores" && html`
         <main className="page-grid">
@@ -680,6 +805,31 @@ function FootballNewsStrip({ news, navigate }) {
   `;
 }
 
+function ApiSportsConfig({ apiKey, setApiKey }) {
+  const [draft, setDraft] = useState(apiKey);
+  useEffect(() => setDraft(apiKey), [apiKey]);
+  const saveKey = () => setApiKey(draft.trim());
+  const clearKey = () => {
+    localStorage.removeItem(API_SPORTS_KEY_STORAGE);
+    setDraft("");
+    setApiKey("");
+  };
+  return html`
+    <section className=${`api-sports-config ${apiKey ? "connected" : ""}`}>
+      <div>
+        <strong>${apiKey ? "Football API-SPORTS actif" : "Clé API-SPORTS requise pour tous les matchs football"}</strong>
+        <span>${apiKey ? "Le football charge /fixtures API-SPORTS pour tous les pays et ligues du jour." : "Colle la clé x-apisports-key pour remplacer ESPN sur Football et Coupe du Monde."}</span>
+      </div>
+      <label>
+        <span>x-apisports-key</span>
+        <input value=${draft} onInput=${(event) => setDraft(event.target.value)} type="password" placeholder="Colle ta clé API-SPORTS" />
+      </label>
+      <button type="button" className="liquid-button active" onClick=${saveKey}>Activer</button>
+      ${apiKey && html`<button type="button" className="liquid-button" onClick=${clearKey}>Retirer</button>`}
+    </section>
+  `;
+}
+
 function SportIcon({ id }) {
   if (id === "world-cup") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v3.5c0 3.1-1.7 5.2-4 5.2s-4-2.1-4-5.2V4Z" /><path d="M8 6H5.5c0 3 .9 4.7 3.2 5.3M16 6h2.5c0 3-.9 4.7-3.2 5.3M12 12.7V17M8.8 20h6.4M10 17h4" /><circle className="cup-dot" cx="17.4" cy="5.2" r="1.8" /></svg>`;
   if (id === "basketball") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.8 12h16.4M12 3.5v17M5.8 6.2c3 2.4 4.6 5.9 4.7 10.8M18.2 6.2c-3 2.4-4.6 5.9-4.7 10.8" /></svg>`;
@@ -695,12 +845,13 @@ function SportIcon({ id }) {
 }
 
 function LeftPanel({ sport, matches, favorites, openMatch, selectSearch }) {
-  const countries = [...new Map(sport.leagues.map((item) => [item.country, item])).values()];
+  const leagueSource = sport.id === "football" && matches.length ? [...new Map(matches.map((match) => [match.competition.id, match.competition])).values()] : sport.leagues;
+  const countries = [...new Map(leagueSource.map((item) => [item.country, item])).values()];
   return html`
     <aside className="left-panel">
-      <section className="panel"><h2>Ligues épinglées</h2><div className="stack">${sport.leagues.filter((item) => item.pinned).map((item) => html`<${LeagueButton} key=${item.id} league=${item} count=${countForLeague(matches, item.id)} onClick=${() => selectSearch(item.label)} />`)}</div></section>
+      <section className="panel"><h2>${sport.id === "football" ? "Ligues du jour" : "Ligues épinglées"}</h2><div className="stack">${leagueSource.slice(0, 20).map((item) => html`<${LeagueButton} key=${item.id} league=${item} count=${countForLeague(matches, item.id)} onClick=${() => selectSearch(item.label)} />`)}</div></section>
       <section className="panel"><h2>Mes équipes</h2>${favorites.length ? html`<div className="stack">${favorites.map((match) => html`<button className="favorite-row" onClick=${() => openMatch(match)}><strong>${match.away.name} - ${match.home.name}</strong><span>${match.status}</span></button>`)}</div>` : html`<p className="muted">Clique sur une étoile pour ajouter un match.</p>`}</section>
-      <section className="panel standings-panel"><h2>Classements</h2><div className="country-list">${countries.map((item) => html`<button className="country-link" onClick=${() => selectSearch(item.country)}><span className="country-main"><${Flag} code=${item.flag} /><strong>${item.country}</strong></span><span className="count-pill">${sport.leagues.filter((league) => league.country === item.country).length}</span></button>`)}</div></section>
+      <section className="panel standings-panel"><h2>Pays</h2><div className="country-list">${countries.map((item) => html`<button className="country-link" onClick=${() => selectSearch(item.country)}><span className="country-main"><${Flag} code=${item.flag} /><strong>${item.country}</strong></span><span className="count-pill">${leagueSource.filter((league) => league.country === item.country).length}</span></button>`)}</div></section>
     </aside>
   `;
 }
@@ -892,6 +1043,10 @@ function buildTimeline(events, homeName, awayName) {
         if (parsed) {
           score.home = parsed.home;
           score.away = parsed.away;
+        } else if (normalizeLooseName(event.team?.displayName) === normalizeLooseName(homeName)) {
+          score.home += 1;
+        } else {
+          score.away += 1;
         }
       }
       return {
@@ -938,7 +1093,74 @@ function SummaryEventRow({ row }) {
   `;
 }
 
-function MatchPage({ match, navigate }) {
+function mapApiSportsEvent(event, match) {
+  const type = String(event.type || "").toLowerCase();
+  const detail = String(event.detail || "").toLowerCase();
+  const kind = type.includes("goal") ? "goal" : type.includes("card") && detail.includes("yellow") ? "yellow-card" : type.includes("card") ? "red-card" : type.includes("subst") ? "substitution" : type;
+  return {
+    id: `${event.time?.elapsed || ""}-${event.team?.id || ""}-${event.player?.id || ""}-${event.type || ""}`,
+    type: { type: kind },
+    text: event.comments || event.detail || event.type || "",
+    shortText: `${event.player?.name || ""} ${event.detail || event.type || ""}`.trim(),
+    period: { number: (event.time?.elapsed || 0) > 45 ? 2 : 1 },
+    clock: { value: (event.time?.elapsed || 0) * 60, displayValue: event.time?.elapsed ? `${event.time.elapsed}'` : "" },
+    team: { displayName: event.team?.name || "" },
+    participants: [
+      event.player?.name ? { athlete: { displayName: event.player.name } } : null,
+      event.assist?.name ? { athlete: { displayName: event.assist.name } } : null,
+    ].filter(Boolean),
+  };
+}
+
+function normalizeApiSportsSummary(eventsPayload, statsPayload, lineupsPayload, playersPayload, match) {
+  const events = (eventsPayload?.response || []).map((event) => mapApiSportsEvent(event, match));
+  const boxscoreTeams = (statsPayload?.response || []).map((team) => ({
+    team: { displayName: team.team?.name || "" },
+    statistics: (team.statistics || []).map((stat) => ({
+      name: stat.type,
+      label: stat.type,
+      displayValue: stat.value ?? "0",
+    })),
+  }));
+  const rosters = (lineupsPayload?.response || []).map((team) => ({
+    team: { displayName: team.team?.name || "" },
+    roster: [
+      ...(team.startXI || []).map((item) => ({ athlete: { displayName: item.player?.name || "" }, position: { abbreviation: item.player?.pos || "" } })),
+      ...(team.substitutes || []).map((item) => ({ athlete: { displayName: item.player?.name || "" }, position: { abbreviation: item.player?.pos || "" } })),
+    ],
+  }));
+  const leaders = (playersPayload?.response || []).map((team) => ({
+    team: { displayName: team.team?.name || "" },
+    leaders: [{
+      displayName: "Joueurs",
+      leaders: (team.players || []).slice(0, 8).map((item) => ({
+        athlete: { displayName: item.player?.name || "" },
+        displayValue: item.statistics?.[0]?.games?.position || "",
+      })),
+    }],
+  }));
+  return { keyEvents: events, commentary: [], boxscore: { teams: boxscoreTeams }, rosters, leaders, standings: [] };
+}
+
+async function fetchApiSportsSummary(match, apiKey) {
+  if (!apiKey) throw new Error("Clé API-SPORTS manquante");
+  const params = { fixture: match.eventId };
+  const [events, stats, lineups, players] = await Promise.allSettled([
+    fetchApiSports("/fixtures/events", apiKey, params),
+    fetchApiSports("/fixtures/statistics", apiKey, params),
+    fetchApiSports("/fixtures/lineups", apiKey, params),
+    fetchApiSports("/fixtures/players", apiKey, params),
+  ]);
+  return normalizeApiSportsSummary(
+    events.status === "fulfilled" ? events.value : null,
+    stats.status === "fulfilled" ? stats.value : null,
+    lineups.status === "fulfilled" ? lineups.value : null,
+    players.status === "fulfilled" ? players.value : null,
+    match,
+  );
+}
+
+function MatchPage({ match, navigate, apiSportsKey }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState("");
   const [mainTab, setMainTab] = useState("match");
@@ -950,7 +1172,7 @@ function MatchPage({ match, navigate }) {
       if (!match) return;
       setLoading("");
       try {
-        const payload = await fetchJson(summaryUrl(match));
+        const payload = match.source === "API-SPORTS" ? await fetchApiSportsSummary(match, apiSportsKey) : await fetchJson(summaryUrl(match));
         if (!cancelled) {
           setSummary(payload);
           setLoading("");
@@ -968,7 +1190,7 @@ function MatchPage({ match, navigate }) {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [match?.id]);
+  }, [match?.id, apiSportsKey]);
 
   if (!match) return html`<main className="page-shell match-page"><button className="liquid-button ghost back-button" onClick=${() => navigate("scores")}>Retour aux scores</button><div className="empty-panel"><h2>Match introuvable</h2><p>Retourne aux scores et ouvre un match chargé depuis ESPN.</p></div></main>`;
 

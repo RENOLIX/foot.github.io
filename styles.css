@@ -464,6 +464,48 @@ button {
   -webkit-box-orient: vertical;
 }
 
+.api-sports-config {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 360px) auto auto;
+  align-items: end;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #dfe7eb;
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.api-sports-config.connected {
+  border-color: rgba(10, 170, 100, 0.3);
+  background: #f1fff8;
+}
+
+.api-sports-config div,
+.api-sports-config label {
+  display: grid;
+  gap: 4px;
+}
+
+.api-sports-config strong {
+  color: #001e28;
+  font-size: 13px;
+}
+
+.api-sports-config span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.api-sports-config input {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #d9e1e5;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
 .page-grid {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr) 330px;
@@ -1728,6 +1770,10 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .api-sports-config {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .footer-link-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 28px;
@@ -1820,6 +1866,10 @@ h1 {
   .strip-news-fallback {
     width: 64px;
     height: 62px;
+  }
+
+  .api-sports-config {
+    grid-template-columns: 1fr;
   }
 
   .score-header {
