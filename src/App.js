@@ -6,6 +6,7 @@ const html = htm.bind(React.createElement);
 const SITE_API_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 const API_SPORTS_BASE = "https://v3.football.api-sports.io";
 const API_SPORTS_KEY_STORAGE = "footlive:apiSportsKey";
+const DEFAULT_API_SPORTS_KEY = "661894b61c2dc1f64827126d2e0d2c5e";
 
 const SPORTS = [
   {
@@ -769,7 +770,7 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [matches, setMatches] = useState([]);
   const [news, setNews] = useState([]);
-  const [apiSportsKey, setApiSportsKey] = useState(() => localStorage.getItem(API_SPORTS_KEY_STORAGE) || "");
+  const [apiSportsKey, setApiSportsKey] = useState(() => localStorage.getItem(API_SPORTS_KEY_STORAGE) || DEFAULT_API_SPORTS_KEY);
   const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem("footlive:favorites") || "[]"));
   const sport = SPORTS.find((item) => item.id === sportId) || SPORTS[0];
 
