@@ -213,6 +213,74 @@ const FOOTBALL_REGIONS = [
   country("Asie", "un"), country("Australie & Océanie", "un"), country("Europe", "eu"), country("Monde", "un"),
 ];
 
+const FOOTBALL_COMPACT_COMPETITIONS = [
+  compactLeague("NPL NSW", "Australie"),
+  compactLeague("NPL Queensland", "Australie"),
+  compactLeague("NPL South Australia", "Australie"),
+  compactLeague("NPL Victoria", "Australie"),
+  compactLeague("NPL Western Australia", "Australie"),
+  compactLeague("NSW League One", "Australie"),
+  compactLeague("Queensland Premier League", "Australie"),
+  compactLeague("SA State League", "Australie"),
+  compactLeague("Tasmania Southern Championship", "Australie"),
+  compactLeague("Victoria Premier League 2", "Australie"),
+  compactLeague("NPL Victoria Women", "Australie"),
+  compactLeague("NPL NSW U20", "Australie"),
+  compactLeague("Premier League", "Bhoutan"),
+  compactLeague("Vysshaya Liga", "Biélorussie"),
+  compactLeague("Serie B", "Brésil"),
+  compactLeague("Amapaense 2 - Phase Finale", "Brésil", ["Amapaense 2", "Amapaense"]),
+  compactLeague("Sul-Matogrossense 2", "Brésil"),
+  compactLeague("Acreano U20", "Brésil"),
+  compactLeague("Paulista U20", "Brésil"),
+  compactLeague("Canadian Premier League", "Canada"),
+  compactLeague("NSL Women", "Canada"),
+  compactLeague("Segunda Division", "Chili", ["Segunda División"]),
+  compactLeague("Copa Chile", "Chili"),
+  compactLeague("Primera Division Women", "Chili"),
+  compactLeague("Super League", "Chine"),
+  compactLeague("WK League - Femmes", "Corée du Sud", ["WK-League", "WK League"]),
+  compactLeague("Meistriliiga", "Estonie"),
+  compactLeague("Premier League", "Ethiopie"),
+  compactLeague("Ykkosliiga", "Finlande"),
+  compactLeague("Kakkonen - Groupe B", "Finlande", ["Kakkonen - Lohko B", "Kakkonen Group B"]),
+  compactLeague("Coupe", "Géorgie", ["David Kipiani Cup", "Cup"]),
+  compactLeague("Persian Gulf Pro League - Ligue des Champions - Phase Finale", "Iran", ["Persian Gulf Pro League", "Azadegan League"]),
+  compactLeague("Premier Division", "Irlande"),
+  compactLeague("Division 1", "Irlande"),
+  compactLeague("Premiership Women", "Irlande du Nord"),
+  compactLeague("Division 1", "Islande"),
+  compactLeague("Division 2", "Islande"),
+  compactLeague("First League", "Kazakhstan"),
+  compactLeague("Premier League - Groupe Relégation", "Koweït", ["Premier League"]),
+  compactLeague("Virsliga", "Lettonie"),
+  compactLeague("I Lyga", "Lituanie"),
+  compactLeague("Elite League", "Macao"),
+  compactLeague("Amical International", "Monde", ["Friendlies", "Friendlies Women"]),
+  compactLeague("Amical Club", "Monde", ["Friendlies Clubs", "Club Friendlies"]),
+  compactLeague("Mocambola", "Mozambique"),
+  compactLeague("Division 2 - Groupe 2", "Norvège", ["2. Division - Group 2"]),
+  compactLeague("Division 3 - Group 1", "Norvège", ["3. Division - Girone 1", "3. Division - Group 1"]),
+  compactLeague("Division 3 - Group 4", "Norvège", ["3. Division - Girone 4", "3. Division - Group 4"]),
+  compactLeague("Division 3 - Group 5", "Norvège", ["3. Division - Girone 5", "3. Division - Group 5"]),
+  compactLeague("Division 1 Women", "Norvège"),
+  compactLeague("Copa de la Liga", "Pérou"),
+  compactLeague("Youth League", "Russie"),
+  compactLeague("Premier League", "Sierra Leone"),
+  compactLeague("National league", "Somalie"),
+  compactLeague("Superettan", "Suède"),
+  compactLeague("Division 1 - Nord", "Suède", ["Ettan - Norra"]),
+  compactLeague("Division 1 - Sud", "Suède", ["Ettan - Södra"]),
+  compactLeague("Division 2 - Götaland Nord", "Suède"),
+  compactLeague("Division 2 - Norra Svealand", "Suède"),
+  compactLeague("Division 2 - Södra Götaland", "Suède"),
+  compactLeague("Division 2 - Västra Götaland", "Suède"),
+  compactLeague("Vysshaya Liga", "Tadjikistan"),
+  compactLeague("USL League Two", "USA"),
+  compactLeague("Division 1", "Yemen"),
+  compactLeague("Premier Soccer League", "Zimbabwe"),
+];
+
 function league(id, label, country, flag, path, pinned = false) {
   return { id, label, country, flag, path, pinned };
 }
@@ -223,6 +291,10 @@ function pinnedLeague(id, label, countryName, flag, aliases = []) {
 
 function country(label, flag) {
   return { id: `country-${normalizePlain(label)}`, label, country: label, flag };
+}
+
+function compactLeague(label, countryName, aliases = []) {
+  return { id: `compact-${normalizePlain(countryName)}-${normalizePlain(label)}`, label, country: countryName, aliases };
 }
 
 function readRoute() {
@@ -553,6 +625,48 @@ function translateApiLeagueName(name) {
   return labels[name] || name || "Compétition";
 }
 
+function translateApiCountryName(name) {
+  const labels = {
+    "Australia": "Australie",
+    "Bhutan": "Bhoutan",
+    "Belarus": "Biélorussie",
+    "Brazil": "Brésil",
+    "Canada": "Canada",
+    "Chile": "Chili",
+    "China": "Chine",
+    "South-Korea": "Corée du Sud",
+    "South Korea": "Corée du Sud",
+    "Estonia": "Estonie",
+    "Ethiopia": "Ethiopie",
+    "Finland": "Finlande",
+    "Georgia": "Géorgie",
+    "Iran": "Iran",
+    "Ireland": "Irlande",
+    "Northern-Ireland": "Irlande du Nord",
+    "Northern Ireland": "Irlande du Nord",
+    "Iceland": "Islande",
+    "Kazakhstan": "Kazakhstan",
+    "Kuwait": "Koweït",
+    "Latvia": "Lettonie",
+    "Lithuania": "Lituanie",
+    "Macao": "Macao",
+    "World": "Monde",
+    "Mozambique": "Mozambique",
+    "Norway": "Norvège",
+    "Peru": "Pérou",
+    "Russia": "Russie",
+    "Sierra-Leone": "Sierra Leone",
+    "Sierra Leone": "Sierra Leone",
+    "Somalia": "Somalie",
+    "Sweden": "Suède",
+    "Tajikistan": "Tadjikistan",
+    "USA": "USA",
+    "Yemen": "Yemen",
+    "Zimbabwe": "Zimbabwe",
+  };
+  return labels[name] || name || "Monde";
+}
+
 function apiSportsState(short) {
   if (["1H", "2H", "ET", "BT", "P", "LIVE", "INT"].includes(short)) return "in";
   if (["FT", "AET", "PEN"].includes(short)) return "post";
@@ -585,7 +699,7 @@ function normalizeApiSportsFixture(item) {
     competition: {
       id: `api-league-${leagueInfo.id}`,
       label: translateApiLeagueName(leagueInfo.name),
-      country: leagueInfo.country || "Monde",
+      country: translateApiCountryName(leagueInfo.country),
       flag: leagueInfo.flag || leagueInfo.logo || "un",
       path: "",
       apiLeagueId: leagueInfo.id,
@@ -972,9 +1086,21 @@ function ScoreHeader({ filter, setFilter, date, setDate }) {
 }
 
 function Scoreboard({ matches, favorites, toggleFavorite, openMatch }) {
+  const [expandedGroups, setExpandedGroups] = useState({});
   const groups = groupByCompetition(matches);
+  const compactMode = matches.some((match) => match.source === "API-SPORTS");
+  const toggleGroup = (key) => setExpandedGroups((items) => ({ ...items, [key]: !items[key] }));
   if (!groups.length) return html`<div className="match-list"><section className="competition"><div className="competition-head"><span>Aucun match</span></div><div className="empty-match-row">Aucun match ESPN pour ce filtre.</div></section></div>`;
-  return html`<div className="match-list">${groups.map(([key, items]) => html`<section className="competition" key=${key}><div className="competition-head"><span className="competition-main"><button className="star-btn header-star" type="button">☆</button><${Flag} code=${items[0].competition.flag} /><strong>${items[0].competition.country.toUpperCase()}: ${items[0].competition.label}</strong><span className="pin-mark">●</span></span><button className="standings-link" type="button">Classement Live ˄</button></div>${items.map((match) => html`<${MatchRow} key=${match.id} match=${match} favorite=${favorites.includes(match.id)} toggleFavorite=${toggleFavorite} openMatch=${openMatch} />`)}</section>`)}</div>`;
+  return html`<div className="match-list">${groups.map(([key, items]) => {
+    const isOpen = !compactMode || expandedGroups[key];
+    return html`<section className=${`competition ${compactMode ? "compact-competition" : ""}`} key=${key}>
+      <div className="competition-head">
+        <span className="competition-main"><button className="star-btn header-star" type="button">☆</button><${Flag} code=${items[0].competition.flag} /><strong>${items[0].competition.country.toUpperCase()}: ${items[0].competition.label}</strong><span className="pin-mark">●</span></span>
+        ${compactMode ? html`<button className="compact-toggle" type="button" onClick=${() => toggleGroup(key)}>${isOpen ? "Masquer matchs" : `Afficher matchs (${items.length})`}</button>` : html`<button className="standings-link" type="button">Classement Live ˄</button>`}
+      </div>
+      ${isOpen && items.map((match) => html`<${MatchRow} key=${match.id} match=${match} favorite=${favorites.includes(match.id)} toggleFavorite=${toggleFavorite} openMatch=${openMatch} />`)}
+    </section>`;
+  })}</div>`;
 }
 
 function MatchRow({ match, favorite, toggleFavorite, openMatch }) {
@@ -1473,8 +1599,22 @@ function groupByCompetition(matches) {
     const second = b[1][0].competition;
     if (first.id === "fifa.world") return -1;
     if (second.id === "fifa.world") return 1;
+    const firstCompact = compactCompetitionIndex(first);
+    const secondCompact = compactCompetitionIndex(second);
+    if (firstCompact !== secondCompact) return firstCompact - secondCompact;
     return `${first.country} ${first.label}`.localeCompare(`${second.country} ${second.label}`, "fr");
   });
+}
+
+function compactCompetitionIndex(competition) {
+  const country = normalizePlain(competition.country);
+  const label = normalizePlain(competition.label);
+  const index = FOOTBALL_COMPACT_COMPETITIONS.findIndex((item) => {
+    const countryMatches = normalizePlain(item.country) === country;
+    const names = [item.label, ...(item.aliases || [])].map(normalizePlain);
+    return countryMatches && names.some((name) => label === name || label.includes(name) || name.includes(label));
+  });
+  return index === -1 ? 10000 : index;
 }
 
 function matchLabel(match) {
