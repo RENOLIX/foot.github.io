@@ -793,7 +793,7 @@ function ArticlePage({ article, sport, navigate }) {
       if (!article) return;
       setDetail(article);
       setTranslated(null);
-      setStatus("Chargement de l'article complet ESPN...");
+      setStatus("");
       let full = article;
       try {
         full = await fetchFullArticle(article);
@@ -802,12 +802,12 @@ function ArticlePage({ article, sport, navigate }) {
       }
       if (cancelled) return;
       setDetail(full);
-      setStatus(full.loadedFull ? "Article ESPN complet chargé. Traduction française en cours..." : "Traduction française de l'actualité ESPN disponible...");
+      setStatus("");
       try {
         const fr = await translateArticle(full);
         if (!cancelled) {
           setTranslated(fr);
-          setStatus(full.loadedFull ? "Article ESPN complet traduit en français" : "Actualité ESPN traduite en français");
+          setStatus("");
         }
       } catch {
         if (!cancelled) setStatus("Actualité ESPN réelle affichée. Traduction indisponible pour le moment.");
@@ -822,7 +822,7 @@ function ArticlePage({ article, sport, navigate }) {
   if (!article) return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><div className="empty-panel"><h2>Aucun article ESPN chargé</h2><p>Le site n'affiche pas de faux article local.</p></div></main>`;
   const shown = translated || detail || article;
   const paragraphs = shown.paragraphs?.length ? shown.paragraphs : htmlToParagraphs(shown.body || shown.description || "");
-  return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualité ESPN réelle</p><h1>${shown.title}</h1><div className="article-meta"><span>${shown.byline || "ESPN"}</span><span>${formatNewsDate(shown.published)}</span><strong>${shown.translated ? "Français" : "Source ESPN"}</strong></div>${shown.image && html`<figure className="article-figure"><img className="article-hero" src=${shown.image} alt=${shown.imageAlt || ""} /><figcaption>${shown.imageCredit || shown.imageAlt || ""}</figcaption></figure>`}<p className="article-lead">${shown.description || ""}</p><div className="article-status">${status}</div><div className="article-body">${paragraphs.map((paragraph) => html`<p>${paragraph}</p>`)}</div></article></main>`;
+  return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualité ESPN réelle</p><h1>${shown.title}</h1><div className="article-meta"><span>${shown.byline || "ESPN"}</span><span>${formatNewsDate(shown.published)}</span><strong>${shown.translated ? "Français" : "Source ESPN"}</strong></div>${shown.image && html`<figure className="article-figure"><img className="article-hero" src=${shown.image} alt=${shown.imageAlt || ""} /><figcaption>${shown.imageCredit || shown.imageAlt || ""}</figcaption></figure>`}<p className="article-lead">${shown.description || ""}</p>${status && html`<div className="article-status">${status}</div>`}<div className="article-body">${paragraphs.map((paragraph) => html`<p>${paragraph}</p>`)}</div></article></main>`;
 }
 
 function FavoritesPage({ favorites, navigate, openMatch }) {
