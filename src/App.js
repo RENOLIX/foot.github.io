@@ -6,7 +6,7 @@ const html = htm.bind(React.createElement);
 const SITE_API_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 const API_SPORTS_BASE = "https://v3.football.api-sports.io";
 const API_SPORTS_KEY_STORAGE = "footlive:apiSportsKey";
-const DEFAULT_API_SPORTS_KEY = "91496eecf06fda7261151b0c90c10c2a";
+const DEFAULT_API_SPORTS_KEY = "9cc37aea4c987836db0e4066ee82d271";
 
 const SPORTS = [
   {
