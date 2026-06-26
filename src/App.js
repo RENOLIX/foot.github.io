@@ -145,8 +145,84 @@ const SPORT_NAV_ITEMS = [
   { id: "more", label: "Autres", target: "other" },
 ];
 
+const FOOTBALL_PINNED_LEAGUES = [
+  pinnedLeague("pin-bundesliga", "Bundesliga", "Allemagne", "de"),
+  pinnedLeague("pin-premier-league", "Premier League", "Angleterre", "gb-eng"),
+  pinnedLeague("pin-laliga", "LaLiga", "Espagne", "es"),
+  pinnedLeague("pin-ligue-1", "Ligue 1", "France", "fr"),
+  pinnedLeague("pin-ligue-2", "Ligue 2", "France", "fr"),
+  pinnedLeague("pin-coupe-france", "Coupe de France", "France", "fr"),
+  pinnedLeague("pin-serie-a", "Serie A", "Italie", "it"),
+  pinnedLeague("pin-eredivisie", "Eredivisie", "Pays-Bas", "nl"),
+  pinnedLeague("pin-euro", "Euro", "Europe", "eu"),
+  pinnedLeague("pin-champions", "Ligue des Champions", "Europe", "eu", ["UEFA Champions League"]),
+  pinnedLeague("pin-europa", "Ligue Europa", "Europe", "eu", ["UEFA Europa League"]),
+  pinnedLeague("pin-conference", "Ligue Conférence", "Europe", "eu", ["UEFA Europa Conference League"]),
+  pinnedLeague("pin-nations", "Ligue des Nations UEFA", "Europe", "eu", ["UEFA Nations League"]),
+  pinnedLeague("pin-world-cup", "Championnat du monde", "Monde", "un", ["Coupe du monde", "World Cup", "FIFA World Cup"]),
+];
+
+const FOOTBALL_COUNTRIES = [
+  country("Afrique du Sud", "za"), country("Albanie", "al"), country("Algérie", "dz"), country("Allemagne", "de"),
+  country("Andorre", "ad"), country("Angleterre", "gb-eng"), country("Angola", "ao"), country("Antigua & Barbuda", "ag"),
+  country("Arabie Saoudite", "sa"), country("Argentine", "ar"), country("Arménie", "am"), country("Aruba", "aw"),
+  country("Australie", "au"), country("Autriche", "at"), country("Azerbaïdjan", "az"), country("Bahreïn", "bh"),
+  country("Bangladesh", "bd"), country("Barbade", "bb"), country("Belgique", "be"), country("Benin", "bj"),
+  country("Bermudes", "bm"), country("Bhoutan", "bt"), country("Biélorussie", "by"), country("Bolivie", "bo"),
+  country("Bosnie-Herzégovine", "ba"), country("Botswana", "bw"), country("Brésil", "br"), country("Bulgarie", "bg"),
+  country("Burkina Faso", "bf"), country("Burundi", "bi"), country("Cambodge", "kh"), country("Cameroun", "cm"),
+  country("Canada", "ca"), country("Cap-Vert", "cv"), country("Chili", "cl"), country("Chine", "cn"),
+  country("Chypre", "cy"), country("Colombie", "co"), country("Congo", "cg"), country("Corée du Sud", "kr"),
+  country("Costa Rica", "cr"), country("Cote d'Ivoire", "ci"), country("Croatie", "hr"), country("Danemark", "dk"),
+  country("Ecosse", "gb-sct"), country("Egypte", "eg"), country("Emirats Arabes Unis", "ae"), country("Equateur", "ec"),
+  country("Espagne", "es"), country("Estonie", "ee"), country("Eswatini", "sz"), country("Ethiopie", "et"),
+  country("Fidji", "fj"), country("Finlande", "fi"), country("France", "fr"), country("Gabon", "ga"),
+  country("Gambie", "gm"), country("Géorgie", "ge"), country("Ghana", "gh"), country("Gibraltar", "gi"),
+  country("Grèce", "gr"), country("Guatemala", "gt"), country("Guinée", "gn"), country("Haïti", "ht"),
+  country("Honduras", "hn"), country("Hong Kong", "hk"), country("Hongrie", "hu"), country("Iles Féroé", "fo"),
+  country("Inde", "in"), country("Indonésie", "id"), country("Irak", "iq"), country("Iran", "ir"),
+  country("Irlande", "ie"), country("Irlande du Nord", "gb-nir"), country("Islande", "is"), country("Israël", "il"),
+  country("Italie", "it"), country("Jamaique", "jm"), country("Japon", "jp"), country("Jordanie", "jo"),
+  country("Kazakhstan", "kz"), country("Kenya", "ke"), country("Kosovo", "xk"), country("Koweït", "kw"),
+  country("Kyrgyzstan", "kg"), country("Laos", "la"), country("Lesotho", "ls"), country("Lettonie", "lv"),
+  country("Liban", "lb"), country("Libéria", "lr"), country("Libye", "ly"), country("Liechtenstein", "li"),
+  country("Lituanie", "lt"), country("Luxembourg", "lu"), country("Macao", "mo"), country("Macédoine du Nord", "mk"),
+  country("Malawi", "mw"), country("Malaysie", "my"), country("Mali", "ml"), country("Malte", "mt"),
+  country("Maroc", "ma"), country("Martinique", "mq"), country("Maurice", "mu"), country("Mauritanie", "mr"),
+  country("Mexique", "mx"), country("Moldavie", "md"), country("Mongolie", "mn"), country("Monténégro", "me"),
+  country("Mozambique", "mz"), country("Myanmar", "mm"), country("Nicaragua", "ni"), country("Niger", "ne"),
+  country("Nigéria", "ng"), country("Norvège", "no"), country("Nouvelle-Zélande", "nz"), country("Oman", "om"),
+  country("Ouganda", "ug"), country("Ouzbékistan", "uz"), country("Pakistan", "pk"), country("Palestine", "ps"),
+  country("Panama", "pa"), country("Paraguay", "py"), country("Pays-Bas", "nl"), country("Pays de Galles", "gb-wls"),
+  country("Pérou", "pe"), country("Philippines", "ph"), country("Pologne", "pl"), country("Portugal", "pt"),
+  country("Qatar", "qa"), country("RD Congo", "cd"), country("République Dominicaine", "do"), country("République Tchèque", "cz"),
+  country("Roumanie", "ro"), country("Russie", "ru"), country("Rwanda", "rw"), country("Salvador", "sv"),
+  country("San Marin", "sm"), country("Sénégal", "sn"), country("Serbie", "rs"), country("Seychelles", "sc"),
+  country("Sierra Leone", "sl"), country("Singapour", "sg"), country("Slovaquie", "sk"), country("Slovénie", "si"),
+  country("Somalie", "so"), country("Soudan", "sd"), country("Sri Lanka", "lk"), country("Suède", "se"),
+  country("Suisse", "ch"), country("Suriname", "sr"), country("Syrie", "sy"), country("Tadjikistan", "tj"),
+  country("Taïwan", "tw"), country("Tanzanie", "tz"), country("Tchad", "td"), country("Thaïlande", "th"),
+  country("Togo", "tg"), country("Trinité-et-Tobago", "tt"), country("Tunisie", "tn"), country("Turkménistan", "tm"),
+  country("Turquie", "tr"), country("Ukraine", "ua"), country("Uruguay", "uy"), country("USA", "us"),
+  country("Vénézuela", "ve"), country("Viêt Nam", "vn"), country("Yemen", "ye"), country("Zambie", "zm"),
+  country("Zimbabwe", "zw"),
+];
+
+const FOOTBALL_REGIONS = [
+  country("Afrique", "un"), country("Amérique du Nord et Centrale", "un"), country("Amérique du Sud", "un"),
+  country("Asie", "un"), country("Australie & Océanie", "un"), country("Europe", "eu"), country("Monde", "un"),
+];
+
 function league(id, label, country, flag, path, pinned = false) {
   return { id, label, country, flag, path, pinned };
+}
+
+function pinnedLeague(id, label, countryName, flag, aliases = []) {
+  return { id, label, country: countryName, flag, aliases, pinned: true };
+}
+
+function country(label, flag) {
+  return { id: `country-${normalizePlain(label)}`, label, country: label, flag };
 }
 
 function readRoute() {
@@ -162,6 +238,10 @@ function flagUrl(code) {
   if (!code) return "https://flagcdn.com/w40/un.png";
   if (/^https?:\/\//i.test(code)) return code;
   return code === "un" ? "https://flagcdn.com/w40/un.png" : `https://flagcdn.com/w40/${code}.png`;
+}
+
+function normalizePlain(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 function Flag({ code }) {
@@ -845,13 +925,15 @@ function SportIcon({ id }) {
 }
 
 function LeftPanel({ sport, matches, favorites, openMatch, selectSearch }) {
-  const leagueSource = sport.id === "football" && matches.length ? [...new Map(matches.map((match) => [match.competition.id, match.competition])).values()] : sport.leagues;
-  const countries = [...new Map(leagueSource.map((item) => [item.country, item])).values()];
+  const isFootball = sport.id === "football";
+  const leagueSource = isFootball ? FOOTBALL_PINNED_LEAGUES : sport.leagues;
+  const countries = isFootball ? FOOTBALL_COUNTRIES : [...new Map(leagueSource.map((item) => [item.country, item])).values()];
   return html`
     <aside className="left-panel">
-      <section className="panel"><h2>${sport.id === "football" ? "Ligues du jour" : "Ligues épinglées"}</h2><div className="stack">${leagueSource.slice(0, 20).map((item) => html`<${LeagueButton} key=${item.id} league=${item} count=${countForLeague(matches, item.id)} onClick=${() => selectSearch(item.label)} />`)}</div></section>
+      <section className="panel"><h2>Ligues Épinglées</h2><div className="stack">${leagueSource.map((item) => html`<${LeagueButton} key=${item.id} league=${item} count=${countForLeague(matches, item)} onClick=${() => selectSearch(item.aliases?.[0] || item.label)} />`)}</div></section>
       <section className="panel"><h2>Mes équipes</h2>${favorites.length ? html`<div className="stack">${favorites.map((match) => html`<button className="favorite-row" onClick=${() => openMatch(match)}><strong>${match.away.name} - ${match.home.name}</strong><span>${match.status}</span></button>`)}</div>` : html`<p className="muted">Clique sur une étoile pour ajouter un match.</p>`}</section>
-      <section className="panel standings-panel"><h2>Pays</h2><div className="country-list">${countries.map((item) => html`<button className="country-link" onClick=${() => selectSearch(item.country)}><span className="country-main"><${Flag} code=${item.flag} /><strong>${item.country}</strong></span><span className="count-pill">${leagueSource.filter((league) => league.country === item.country).length}</span></button>`)}</div></section>
+      <section className="panel standings-panel"><h2>Pays</h2><div className="country-list">${countries.map((item) => html`<button className="country-link" onClick=${() => selectSearch(item.country)}><span className="country-main"><${Flag} code=${item.flag} /><strong>${item.country}</strong></span><span className="count-pill">${countForCountry(matches, item.country)}</span></button>`)}</div></section>
+      ${isFootball && html`<section className="panel standings-panel"><h2>Autres compétitions</h2><div className="country-list">${FOOTBALL_REGIONS.map((item) => html`<button className="country-link" onClick=${() => selectSearch(item.country)}><span className="country-main"><${Flag} code=${item.flag} /><strong>${item.country}</strong></span><span className="count-pill">${countForCountry(matches, item.country)}</span></button>`)}</div></section>`}
     </aside>
   `;
 }
@@ -1355,8 +1437,18 @@ function Footer({ navigate, sport, matches, news }) {
   `;
 }
 
-function countForLeague(matches, id) {
-  return matches.filter((match) => match.competition.id === id).length;
+function countForLeague(matches, leagueRef) {
+  const id = typeof leagueRef === "string" ? leagueRef : leagueRef.id;
+  const labels = typeof leagueRef === "string" ? [] : [leagueRef.label, ...(leagueRef.aliases || [])].map(normalizePlain);
+  return matches.filter((match) => {
+    const competitionLabel = normalizePlain(match.competition.label);
+    return match.competition.id === id || labels.some((label) => competitionLabel === label || competitionLabel.includes(label) || label.includes(competitionLabel));
+  }).length;
+}
+
+function countForCountry(matches, countryName) {
+  const target = normalizePlain(countryName);
+  return matches.filter((match) => normalizePlain(match.competition.country) === target).length;
 }
 
 function groupByCompetition(matches) {
