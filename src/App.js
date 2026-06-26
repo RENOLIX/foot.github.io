@@ -20,9 +20,33 @@ const SPORTS = [
       league("ger.1", "Bundesliga", "Allemagne", "de", "soccer/ger.1"),
       league("por.1", "Liga Portugal", "Portugal", "pt", "soccer/por.1"),
       league("ned.1", "Eredivisie", "Pays-Bas", "nl", "soccer/ned.1"),
+      league("uefa.europa", "Ligue Europa", "Europe", "eu", "soccer/uefa.europa"),
+      league("uefa.europa.conf", "Ligue Conférence", "Europe", "eu", "soccer/uefa.europa.conf"),
+      league("eng.2", "Championship", "Angleterre", "gb-eng", "soccer/eng.2"),
+      league("fra.2", "Ligue 2", "France", "fr", "soccer/fra.2"),
+      league("esp.2", "LaLiga 2", "Espagne", "es", "soccer/esp.2"),
+      league("ita.2", "Serie B", "Italie", "it", "soccer/ita.2"),
+      league("ger.2", "2. Bundesliga", "Allemagne", "de", "soccer/ger.2"),
       league("usa.1", "MLS", "USA", "us", "soccer/usa.1"),
+      league("usa.nwsl", "NWSL", "USA", "us", "soccer/usa.nwsl"),
+      league("usa.usl.1", "USL Championship", "USA", "us", "soccer/usa.usl.1"),
       league("mex.1", "Liga MX", "Mexique", "mx", "soccer/mex.1"),
-      league("bra.1", "Serie A Betano", "Bresil", "br", "soccer/bra.1"),
+      league("mex.2", "Liga de Expansión MX", "Mexique", "mx", "soccer/mex.2"),
+      league("bra.1", "Serie A Betano", "Brésil", "br", "soccer/bra.1"),
+      league("bra.2", "Serie B", "Brésil", "br", "soccer/bra.2"),
+      league("arg.1", "Primera División", "Argentine", "ar", "soccer/arg.1"),
+      league("col.1", "Primera A", "Colombie", "co", "soccer/col.1"),
+      league("chi.1", "Primera División", "Chili", "cl", "soccer/chi.1"),
+      league("ecu.1", "LigaPro", "Équateur", "ec", "soccer/ecu.1"),
+      league("per.1", "Liga 1", "Pérou", "pe", "soccer/per.1"),
+      league("uru.1", "Primera División", "Uruguay", "uy", "soccer/uru.1"),
+      league("par.1", "Primera División", "Paraguay", "py", "soccer/par.1"),
+      league("aus.1", "A-League", "Australie", "au", "soccer/aus.1"),
+      league("chn.1", "Super League", "Chine", "cn", "soccer/chn.1"),
+      league("jpn.1", "J1 League", "Japon", "jp", "soccer/jpn.1"),
+      league("rsa.1", "Premiership", "Afrique du Sud", "za", "soccer/rsa.1"),
+      league("tur.1", "Süper Lig", "Turquie", "tr", "soccer/tur.1"),
+      league("sco.1", "Premiership", "Écosse", "gb-sct", "soccer/sco.1"),
     ],
   },
   {
@@ -146,6 +170,11 @@ function espnDate(date) {
 
 function todayInAlgiers() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Algiers" }).format(new Date());
+}
+
+function matchTime(date) {
+  if (!date) return "";
+  return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(date));
 }
 
 function scoreboardUrl(item, date) {
@@ -356,6 +385,7 @@ function normalizeEvent(event, item) {
     eventId: event.id,
     leaguePath: item.path,
     date: (event.date || "").slice(0, 10),
+    kickTime: matchTime(event.date),
     status: statusType.shortDetail || statusType.detail || "A venir",
     state: statusType.state || "pre",
     source: "ESPN",
@@ -558,6 +588,7 @@ function App() {
       <${Topbar} query=${query} setQuery=${setQuery} route=${route} navigate=${navigate} />
       <${HeroBanner} sport=${sport} matches=${matches} navigate=${navigate} />
       <${SportsBar} navId=${navId} setSportId=${changeSport} />
+      ${route.view === "scores" && sport.id === "football" && html`<${FootballNewsStrip} news=${news} navigate=${navigate} />`}
       ${route.view === "news" && html`<${NewsPage} sport=${sport} news=${news} navigate=${navigate} />`}
       ${route.view === "article" && html`<${ArticlePage} article=${currentArticle} sport=${sport} navigate=${navigate} />`}
       ${route.view === "match" && html`<${MatchPage} match=${currentMatch} navigate=${navigate} />`}
@@ -627,6 +658,28 @@ function SportsBar({ navId, setSportId }) {
   </nav>`;
 }
 
+function FootballNewsStrip({ news, navigate }) {
+  const shownNews = useTranslatedNews(news);
+  if (!shownNews.length) return null;
+  return html`
+    <section className="football-news-strip">
+      <div className="strip-heading">
+        <span>Flashscore Actualités</span>
+        <button type="button" onClick=${() => navigate("news")}>Toutes les actualités</button>
+      </div>
+      <div className="strip-news-row">
+        ${shownNews.slice(0, 4).map((item) => html`
+          <button className="strip-news-card" type="button" onClick=${() => navigate("article", item.id)}>
+            ${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<span className="strip-news-fallback">FL</span>`}
+            <strong>${item.title}</strong>
+            <small>${item.description}</small>
+          </button>
+        `)}
+      </div>
+    </section>
+  `;
+}
+
 function SportIcon({ id }) {
   if (id === "world-cup") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v3.5c0 3.1-1.7 5.2-4 5.2s-4-2.1-4-5.2V4Z" /><path d="M8 6H5.5c0 3 .9 4.7 3.2 5.3M16 6h2.5c0 3-.9 4.7-3.2 5.3M12 12.7V17M8.8 20h6.4M10 17h4" /><circle className="cup-dot" cx="17.4" cy="5.2" r="1.8" /></svg>`;
   if (id === "basketball") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.8 12h16.4M12 3.5v17M5.8 6.2c3 2.4 4.6 5.9 4.7 10.8M18.2 6.2c-3 2.4-4.6 5.9-4.7 10.8" /></svg>`;
@@ -687,8 +740,7 @@ function Scoreboard({ matches, favorites, toggleFavorite, openMatch }) {
 }
 
 function MatchRow({ match, favorite, toggleFavorite, openMatch }) {
-  const minute = match.state === "in" ? translateStatus(match.status) : match.state === "post" ? "Terminé" : translateStatus(match.status);
-  const showPreview = match.state !== "in" && match.state !== "post";
+  const minute = match.state === "in" ? translateStatus(match.status) : match.state === "post" ? "Terminé" : match.kickTime || translateStatus(match.status);
   const style = match.state === "in" ? { "--live-progress": `${liveProgress(match.status)}%` } : {};
   return html`
     <div className=${`match-row ${match.state === "in" ? "live-row" : ""}`} style=${style}>
@@ -702,7 +754,7 @@ function MatchRow({ match, favorite, toggleFavorite, openMatch }) {
         <span className=${`score ${match.away.winner ? "winner" : ""}`}>${match.away.score}</span>
         <span className=${`score ${match.home.winner ? "winner" : ""}`}>${match.home.score}</span>
       </div>
-      <div className="preview-cell">${showPreview && html`<span>AVANT-MATCH</span>`}</div>
+      <div className="preview-cell"></div>
     </div>
   `;
 }
@@ -1087,11 +1139,23 @@ function countForLeague(matches, id) {
 
 function groupByCompetition(matches) {
   const map = new Map();
-  matches.forEach((match) => {
+  const sortedMatches = [...matches].sort((a, b) => {
+    const stateRank = { in: 0, pre: 1, post: 2 };
+    const stateDiff = (stateRank[a.state] ?? 3) - (stateRank[b.state] ?? 3);
+    if (stateDiff) return stateDiff;
+    return `${a.date} ${a.kickTime}`.localeCompare(`${b.date} ${b.kickTime}`);
+  });
+  sortedMatches.forEach((match) => {
     const key = `${match.competition.country}-${match.competition.label}`;
     map.set(key, [...(map.get(key) || []), match]);
   });
-  return [...map.entries()];
+  return [...map.entries()].sort((a, b) => {
+    const first = a[1][0].competition;
+    const second = b[1][0].competition;
+    if (first.id === "fifa.world") return -1;
+    if (second.id === "fifa.world") return 1;
+    return `${first.country} ${first.label}`.localeCompare(`${second.country} ${second.label}`, "fr");
+  });
 }
 
 function matchLabel(match) {

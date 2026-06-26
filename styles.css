@@ -289,14 +289,15 @@ button {
   max-width: 100%;
   margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-columns: repeat(9, minmax(92px, 1fr));
   gap: 0;
   min-height: 48px;
   padding: 0;
-  overflow: hidden;
+  overflow-x: auto;
   border: 1px solid #d9e1e5;
   border-radius: 0;
   background: #f2f5f7;
+  scrollbar-width: thin;
 }
 
 .sport-btn {
@@ -304,19 +305,19 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: 6px;
   width: 100%;
-  min-width: 0;
+  min-width: 92px;
   min-height: 48px;
-  padding: 0 11px;
+  padding: 0 6px;
   border: 0;
   border-left: 1px solid rgba(213, 221, 226, 0.78);
   border-radius: 0;
   color: #4e5c62;
   background: transparent;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 900;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.1px;
   text-transform: uppercase;
 }
 
@@ -355,8 +356,11 @@ button {
 
 .sport-btn span:last-child {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-align: center;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.05;
   overflow-wrap: normal;
 }
 
@@ -373,6 +377,91 @@ button {
 .cup-dot {
   fill: #ff0040;
   stroke: #ff0040;
+}
+
+.football-news-strip {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 10px 24px rgba(11, 25, 31, 0.06);
+}
+
+.strip-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.strip-heading span {
+  color: #001e28;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.strip-heading button {
+  border: 0;
+  background: transparent;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: underline;
+}
+
+.strip-news-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.strip-news-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 4px 10px;
+  min-height: 86px;
+  padding: 8px;
+  border: 1px solid #edf1f3;
+  border-radius: 8px;
+  background: #fbfcfd;
+  text-align: left;
+}
+
+.strip-news-card img,
+.strip-news-fallback {
+  grid-row: 1 / span 2;
+  width: 72px;
+  height: 70px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.strip-news-fallback {
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background: var(--green-dark);
+  font-weight: 900;
+}
+
+.strip-news-card strong {
+  color: #001e28;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.strip-news-card small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .page-grid {
@@ -1632,7 +1721,11 @@ h1 {
   }
 
   .sports-bar {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(9, minmax(92px, 1fr));
+  }
+
+  .strip-news-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .footer-link-grid {
@@ -1664,20 +1757,20 @@ h1 {
 
   .sports-bar {
     display: grid;
-    grid-template-columns: 1fr;
-    overflow: hidden;
+    grid-template-columns: repeat(9, minmax(86px, 1fr));
+    overflow-x: auto;
   }
 
   .sport-btn {
     width: 100%;
     max-width: 100%;
-    min-width: 0;
-    min-height: 54px;
-    flex-direction: column;
+    min-width: 86px;
+    min-height: 48px;
+    flex-direction: row;
     gap: 4px;
-    padding: 7px 4px;
+    padding: 5px 4px;
     border-top: 1px solid rgba(213, 221, 226, 0.78);
-    font-size: 10px;
+    font-size: 9px;
     line-height: 1.1;
     white-space: normal !important;
   }
@@ -1713,6 +1806,20 @@ h1 {
   .news-grid,
   .favorite-page-grid {
     grid-template-columns: 1fr;
+  }
+
+  .strip-news-row {
+    grid-template-columns: 1fr;
+  }
+
+  .strip-news-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .strip-news-card img,
+  .strip-news-fallback {
+    width: 64px;
+    height: 62px;
   }
 
   .score-header {
