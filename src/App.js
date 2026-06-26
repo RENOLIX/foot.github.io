@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import htm from "htm";
 
 const html = htm.bind(React.createElement);
-const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports";
+const SITE_API_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 const API_SPORTS_BASE = "https://v3.football.api-sports.io";
 const API_SPORTS_KEY_STORAGE = "footlive:apiSportsKey";
 
@@ -108,7 +108,7 @@ const SPORTS = [
     id: "handball",
     label: "Handball",
     newsPath: "handball/mens",
-    unavailable: "ESPN ne fournit pas de flux site public stable pour le handball sur cette API.",
+    unavailable: "Flux public stable non disponible pour cette rubrique.",
     leagues: [],
   },
   {
@@ -320,7 +320,7 @@ function Flag({ code }) {
   return html`<img className="flag" src=${flagUrl(code)} alt="" loading="lazy" />`;
 }
 
-function espnDate(date) {
+function feedDate(date) {
   return date.split("-").join("");
 }
 
@@ -334,11 +334,11 @@ function matchTime(date) {
 }
 
 function scoreboardUrl(item, date) {
-  return `${ESPN_BASE}/${item.path}/scoreboard?dates=${espnDate(date)}`;
+  return `${SITE_API_BASE}/${item.path}/scoreboard?dates=${feedDate(date)}`;
 }
 
 function summaryUrl(match) {
-  return `${ESPN_BASE}/${match.leaguePath}/summary?event=${match.eventId}`;
+  return `${SITE_API_BASE}/${match.leaguePath}/summary?event=${match.eventId}`;
 }
 
 function addDaysISO(date, days) {
@@ -420,7 +420,7 @@ function translateStatLabel(value) {
 }
 
 function newsUrl(sport) {
-  return `${ESPN_BASE}/${sport.newsPath}/news`;
+  return `${SITE_API_BASE}/${sport.newsPath}/news`;
 }
 
 function hashText(text) {
@@ -544,7 +544,7 @@ function normalizeEvent(event, item) {
     kickTime: matchTime(event.date),
     status: statusType.shortDetail || statusType.detail || "A venir",
     state: statusType.state || "pre",
-    source: "ESPN",
+    source: "LIVE-DATA",
     venue: competition.venue?.fullName || "",
     competition: item,
     home: normalizeTeam(home),
@@ -558,12 +558,12 @@ function normalizeNews(payload) {
     espnId: article.id || "",
     title: article.headline || "Actualité",
     description: article.description || article.type || "",
-    body: article.story || article.description || "Article ESPN affiché directement dans Foot Live.",
+    body: article.story || article.description || "Article affiché directement dans Foot Live.",
     paragraphs: htmlToParagraphs(article.story || article.description || ""),
     image: article.images?.[0]?.url || "",
     imageCredit: article.images?.[0]?.credit || "",
     imageAlt: article.images?.[0]?.alt || article.images?.[0]?.caption || "",
-    byline: article.byline || "ESPN",
+    byline: article.byline || "Rédaction sport",
     published: article.published || article.lastModified || "",
     apiUrl: article.links?.api?.self?.href || (article.id ? `https://content.core.api.espn.com/v1/sports/news/${article.id}` : ""),
     sourceUrl: article.links?.web?.href || "",
@@ -769,7 +769,7 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [matches, setMatches] = useState([]);
   const [news, setNews] = useState([]);
-  const [loadingLabel, setLoadingLabel] = useState("Chargement des matches ESPN...");
+  const [loadingLabel, setLoadingLabel] = useState("");
   const [lastUpdated, setLastUpdated] = useState("");
   const [apiSportsKey, setApiSportsKey] = useState(() => localStorage.getItem(API_SPORTS_KEY_STORAGE) || "");
   const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem("footlive:favorites") || "[]"));
@@ -806,12 +806,12 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      setLoadingLabel(sport.id === "football" && apiSportsKey ? "Chargement des matches API-SPORTS..." : "Chargement des matches ESPN...");
+      setLoadingLabel("");
       if (!sport.leagues.length) {
         if (!cancelled) {
           setMatches([]);
           setNews([]);
-          setLoadingLabel(sport.unavailable || "Aucun flux ESPN configure pour ce sport.");
+          setLoadingLabel("");
         }
         return;
       }
@@ -829,11 +829,11 @@ function App() {
             setMatches(apiMatches);
             setNews(nextNews);
             setLastUpdated(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-            setLoadingLabel(`${apiMatches.length} match(s) API-SPORTS - tous pays/ligues disponibles`);
+            setLoadingLabel("");
           }
           return;
         } catch {
-          if (!cancelled) setLoadingLabel("API-SPORTS indisponible ou clé manquante. Fallback ESPN chargé.");
+          if (!cancelled) setLoadingLabel("");
         }
       }
       const settled = await Promise.allSettled(
@@ -850,11 +850,10 @@ function App() {
         nextNews = [];
       }
       if (!cancelled) {
-        const failed = settled.filter((result) => result.status === "rejected").length;
         setMatches(espnMatches);
         setNews(nextNews);
         setLastUpdated(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-        setLoadingLabel(`${espnMatches.length} match(s) affichés - ${sport.leagues.length - failed}/${sport.leagues.length} compétitions ESPN chargées`);
+        setLoadingLabel("");
       }
     }
     load();
@@ -874,9 +873,13 @@ function App() {
 
   const visibleMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const normalizedQuery = normalizePlain(query);
     return matches.filter((match) => {
       const haystack = `${match.home.name} ${match.away.name} ${match.competition.label} ${match.competition.country}`.toLowerCase();
-      const queryOk = !q || haystack.includes(q);
+      const normalizedHaystack = normalizePlain(haystack);
+      const worldCupQuery = normalizedQuery.includes("coupe du monde") || normalizedQuery.includes("world cup");
+      const worldCupMatch = normalizedHaystack.includes("coupe du monde") || normalizedHaystack.includes("championnat du monde") || normalizedHaystack.includes("world cup");
+      const queryOk = !q || haystack.includes(q) || normalizedHaystack.includes(normalizedQuery) || (worldCupQuery && worldCupMatch);
       const filterOk =
         filter === "all" ||
         filter === "odds" ||
@@ -907,9 +910,9 @@ function App() {
 
   return html`
     <div className="app">
-      <${TopAnnouncement} />
+      <${TopAnnouncement} sport=${sport} matches=${matches} date=${date} />
       <${Topbar} query=${query} setQuery=${setQuery} route=${route} navigate=${navigate} />
-      <${HeroBanner} sport=${sport} matches=${matches} navigate=${navigate} />
+      <${HeroBanner} sport=${sport} matches=${matches} date=${date} navigate=${navigate} />
       <${SportsBar} navId=${navId} setSportId=${changeSport} />
       ${route.view === "scores" && sport.id === "football" && html`<${FootballNewsStrip} news=${news} navigate=${navigate} />`}
       ${route.view === "news" && html`<${NewsPage} sport=${sport} news=${news} navigate=${navigate} />`}
@@ -921,7 +924,7 @@ function App() {
           <${LeftPanel} sport=${sport} matches=${matches} favorites=${favoriteMatches} openMatch=${openMatchPage} selectSearch=${selectSearch} />
           <section className="center-panel">
             <${ScoreHeader} filter=${filter} setFilter=${setFilter} date=${date} setDate=${setDate} />
-            <div className="status-line"><span>${loadingLabel}${lastUpdated ? ` - MAJ ${lastUpdated}` : ""}</span><button className="liquid-button dark" type="button" onClick=${() => setRefreshKey((value) => value + 1)}>Actualiser</button></div>
+            <div className="status-line"><button className="liquid-button dark" type="button" onClick=${() => setRefreshKey((value) => value + 1)}>Actualiser</button></div>
             <${Scoreboard} matches=${visibleMatches} favorites=${favorites} toggleFavorite=${toggleFavorite} openMatch=${openMatchPage} />
           </section>
           <${RightPanel} sport=${sport} news=${news} matches=${matches} openNews=${(item) => navigate("article", item.id)} navigate=${navigate} selectSearch=${selectSearch} />
@@ -932,8 +935,11 @@ function App() {
   `;
 }
 
-function TopAnnouncement() {
-  return html`<div className="announcement"><strong>Foot Live Pro</strong><span>Scores multi-sports ESPN, actualites internes et interface sans compte client.</span></div>`;
+function TopAnnouncement({ sport, matches, date }) {
+  const live = matches.filter((match) => match.state === "in").length;
+  const scheduled = matches.filter((match) => match.state !== "in" && match.state !== "post").length;
+  const firstMatch = matches[0] ? `${matches[0].home.name} - ${matches[0].away.name}` : "Calendrier en attente";
+  return html`<div className="announcement"><strong>${sport.label} - ${formatMatchDate(date)}</strong><span>${matches.length} matchs suivis · ${live} live · ${scheduled} à venir · ${firstMatch}</span></div>`;
 }
 
 function Topbar({ query, setQuery, route, navigate }) {
@@ -953,21 +959,24 @@ function Topbar({ query, setQuery, route, navigate }) {
   `;
 }
 
-function HeroBanner({ sport, matches, navigate }) {
+function HeroBanner({ sport, matches, date, navigate }) {
   const live = matches.filter((match) => match.state === "in").length;
   const scheduled = matches.filter((match) => match.state !== "in" && match.state !== "post").length;
+  const finished = matches.filter((match) => match.state === "post").length;
+  const competitions = new Set(matches.map((match) => `${match.competition.country}-${match.competition.label}`)).size;
+  const featured = matches[0] ? `${matches[0].home.name} - ${matches[0].away.name}` : "Aucun match chargé";
   return html`
     <section className="hero-banner">
       <div className="hero-copy">
-        <p className="eyebrow">Interface livescore premium</p>
-        <h1>Scores propres, actus internes, compétitions ordonnées.</h1>
-        <p>Tableau de bord sportif React inspiré de la structure Flashscore, avec une vraie page actualités et des contrôles utiles.</p>
+        <p className="eyebrow">${sport.label} · ${formatMatchDate(date)}</p>
+        <h1>${matches.length} matchs suivis aujourd'hui</h1>
+        <p>${live} en direct, ${scheduled} à venir, ${finished} terminés, ${competitions} compétitions. Match affiché en premier: ${featured}.</p>
         <div className="hero-actions">
           <button className="liquid-button active" onClick=${() => navigate("scores")}>Voir les scores</button>
           <button className="liquid-button ghost" onClick=${() => navigate("news")}>Lire les actualités</button>
         </div>
       </div>
-      <div className="hero-card"><span>${sport.label}</span><strong>${matches.length}</strong><small>${live} live / ${scheduled} à venir</small></div>
+      <div className="hero-card"><span>${competitions} compétitions</span><strong>${matches.length}</strong><small>${live} live / ${scheduled} à venir</small></div>
     </section>
   `;
 }
@@ -1064,7 +1073,7 @@ function Scoreboard({ matches, favorites, toggleFavorite, openMatch }) {
   const groups = groupByCompetition(matches);
   const compactMode = matches.some((match) => match.source === "API-SPORTS");
   const toggleGroup = (key, defaultOpen = false) => setExpandedGroups((items) => ({ ...items, [key]: !(items[key] ?? defaultOpen) }));
-  if (!groups.length) return html`<div className="match-list"><section className="competition"><div className="competition-head"><span>Aucun match</span></div><div className="empty-match-row">Aucun match ESPN pour ce filtre.</div></section></div>`;
+  if (!groups.length) return html`<div className="match-list"></div>`;
   return html`<div className="match-list">${groups.map(([key, items], index) => {
     const normalizedCompetition = normalizePlain(items[0].competition.label);
     const isWorldCup = normalizedCompetition.includes("championnat du monde") || normalizedCompetition.includes("coupe du monde");
@@ -1120,7 +1129,7 @@ function RightPanel({ sport, news, matches, openNews, navigate, selectSearch }) 
 
 function NewsPage({ sport, news, navigate }) {
   const shownNews = useTranslatedNews(news);
-  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">${sport.label}</p><h1>Actualités sportives</h1><p>Vraies actualités ESPN, traduites en français et consultables directement dans Foot Live.</p></section>${shownNews.length ? html`<div className="news-grid">${shownNews.map((item) => html`<button className="article-card" key=${item.id} onClick=${() => navigate("article", item.id)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="article-fallback">FL</div>`}<span><small>${sport.label} / ${item.translated ? "FR" : "ESPN"}</small><strong>${item.title}</strong><p>${item.description || "Lire l'article complet dans le site."}</p></span></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucune actualité ESPN chargée</h2><p>Le site n'affiche pas d'actualité locale inventée.</p></div>`}</main>`;
+  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">${sport.label}</p><h1>Actualités sportives</h1><p>Actualités réelles, traduites en français et consultables directement dans Foot Live.</p></section>${shownNews.length ? html`<div className="news-grid">${shownNews.map((item) => html`<button className="article-card" key=${item.id} onClick=${() => navigate("article", item.id)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="article-fallback">FL</div>`}<span><small>${sport.label} / ${item.translated ? "FR" : "Direct"}</small><strong>${item.title}</strong><p>${item.description || "Lire l'article complet dans le site."}</p></span></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucune actualité chargée</h2><p>Le site n'affiche pas d'actualité locale inventée.</p></div>`}</main>`;
 }
 
 function ArticlePage({ article, sport, navigate }) {
@@ -1151,7 +1160,7 @@ function ArticlePage({ article, sport, navigate }) {
           setStatus("");
         }
       } catch {
-        if (!cancelled) setStatus("Actualité ESPN réelle affichée. Traduction indisponible pour le moment.");
+        if (!cancelled) setStatus("Actualité réelle affichée. Traduction indisponible pour le moment.");
       }
     }
     loadArticle();
@@ -1160,10 +1169,10 @@ function ArticlePage({ article, sport, navigate }) {
     };
   }, [article?.id]);
 
-  if (!article) return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><div className="empty-panel"><h2>Aucun article ESPN chargé</h2><p>Le site n'affiche pas de faux article local.</p></div></main>`;
+  if (!article) return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><div className="empty-panel"><h2>Aucun article chargé</h2><p>Le site n'affiche pas de faux article local.</p></div></main>`;
   const shown = translated || detail || article;
   const paragraphs = shown.paragraphs?.length ? shown.paragraphs : htmlToParagraphs(shown.body || shown.description || "");
-  return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualité ESPN réelle</p><h1>${shown.title}</h1><div className="article-meta"><span>${shown.byline || "ESPN"}</span><span>${formatNewsDate(shown.published)}</span><strong>${shown.translated ? "Français" : "Source ESPN"}</strong></div>${shown.image && html`<figure className="article-figure"><img className="article-hero" src=${shown.image} alt=${shown.imageAlt || ""} /><figcaption>${shown.imageCredit || shown.imageAlt || ""}</figcaption></figure>`}<p className="article-lead">${shown.description || ""}</p>${status && html`<div className="article-status">${status}</div>`}<div className="article-body">${paragraphs.map((paragraph) => html`<p>${paragraph}</p>`)}</div></article></main>`;
+  return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualité réelle</p><h1>${shown.title}</h1><div className="article-meta"><span>${shown.byline || "Rédaction sport"}</span><span>${formatNewsDate(shown.published)}</span><strong>${shown.translated ? "Français" : "Source directe"}</strong></div>${shown.image && html`<figure className="article-figure"><img className="article-hero" src=${shown.image} alt=${shown.imageAlt || ""} /><figcaption>${shown.imageCredit || shown.imageAlt || ""}</figcaption></figure>`}<p className="article-lead">${shown.description || ""}</p>${status && html`<div className="article-status">${status}</div>`}<div className="article-body">${paragraphs.map((paragraph) => html`<p>${paragraph}</p>`)}</div></article></main>`;
 }
 
 function FavoritesPage({ favorites, navigate, openMatch }) {
@@ -1252,7 +1261,7 @@ function buildTimeline(events, homeName, awayName) {
 function SummaryTimeline({ events, homeName, awayName, comments }) {
   const rows = buildTimeline(events, homeName, awayName);
   const periods = [1, 2].filter((period) => rows.some((row) => row.period === period) || period === 1);
-  if (!rows.length) return html`<section className="match-section summary-card"><p className="muted">Aucun événement clé ESPN chargé.</p></section>`;
+  if (!rows.length) return html`<section className="match-section summary-card"><p className="muted">Aucun événement clé chargé.</p></section>`;
   const periodScore = (period) => {
     const last = [...rows].reverse().find((row) => row.period <= period);
     return `${last?.score.home || 0} - ${last?.score.away || 0}`;
@@ -1382,7 +1391,7 @@ function MatchPage({ match, navigate, apiSportsKey }) {
     };
   }, [match?.id, apiSportsKey]);
 
-  if (!match) return html`<main className="page-shell match-page"><button className="liquid-button ghost back-button" onClick=${() => navigate("scores")}>Retour aux scores</button><div className="empty-panel"><h2>Match introuvable</h2><p>Retourne aux scores et ouvre un match chargé depuis ESPN.</p></div></main>`;
+  if (!match) return html`<main className="page-shell match-page"><button className="liquid-button ghost back-button" onClick=${() => navigate("scores")}>Retour aux scores</button><div className="empty-panel"><h2>Match introuvable</h2><p>Retourne aux scores et ouvre un match chargé.</p></div></main>`;
 
   const competition = summary?.header?.competitions?.[0] || {};
   const competitors = competition.competitors || [];
@@ -1428,14 +1437,14 @@ function MatchPage({ match, navigate, apiSportsKey }) {
       <nav className="match-tabs">${mainTabs.map(([id, label]) => html`<button className=${mainTab === id ? "active" : ""} onClick=${() => setMainTab(id)} type="button">${label}</button>`)}</nav>
       ${mainTab === "match" && html`<div className="match-subtabs">${subTabs.map(([id, label]) => html`<button className=${subTab === id ? "active" : ""} onClick=${() => setSubTab(id)} type="button">${label}</button>`)}</div>`}
       ${mainTab === "match" && subTab === "summary" && html`<${SummaryTimeline} events=${keyEvents} homeName=${match.home.name} awayName=${match.away.name} comments=${commentary} />`}
-      ${mainTab === "match" && subTab === "stats" && html`<section className="match-section"><h3>Stats ESPN</h3><${StatsTable} home=${homeStats} away=${awayStats} homeName=${match.home.name} awayName=${match.away.name} /></section>`}
-      ${mainTab === "match" && subTab === "lineups" && html`<section className="match-section"><h3>Compositions ESPN</h3><${RosterList} rosters=${rosters} /></section>`}
-      ${mainTab === "match" && subTab === "players" && html`<section className="match-section"><h3>Stats joueurs ESPN</h3><${LeadersList} leaders=${leaders} /></section>`}
-      ${mainTab === "match" && subTab === "comments" && html`<section className="match-section"><h3>Commentaires</h3>${commentary.length ? commentary.map((item) => html`<div className="comment-line"><strong>${item.time?.displayValue || ""}</strong><p>${translateText(item.text)}</p></div>`) : html`<p className="muted">Aucun commentaire ESPN chargé.</p>`}</section>`}
+      ${mainTab === "match" && subTab === "stats" && html`<section className="match-section"><h3>Stats</h3><${StatsTable} home=${homeStats} away=${awayStats} homeName=${match.home.name} awayName=${match.away.name} /></section>`}
+      ${mainTab === "match" && subTab === "lineups" && html`<section className="match-section"><h3>Compositions</h3><${RosterList} rosters=${rosters} /></section>`}
+      ${mainTab === "match" && subTab === "players" && html`<section className="match-section"><h3>Stats joueurs</h3><${LeadersList} leaders=${leaders} /></section>`}
+      ${mainTab === "match" && subTab === "comments" && html`<section className="match-section"><h3>Commentaires</h3>${commentary.length ? commentary.map((item) => html`<div className="comment-line"><strong>${item.time?.displayValue || ""}</strong><p>${translateText(item.text)}</p></div>`) : html`<p className="muted">Aucun commentaire chargé.</p>`}</section>`}
       ${mainTab === "odds" && html`<section className="match-section odds-section"><h3>Côtes ${odds?.provider?.name ? html`<span>${odds.provider.name}</span>` : ""}</h3><div className="odds-grid"><div><span>1</span><strong>${formatOdds(odds?.homeTeamOdds)}</strong></div><div><span>X</span><strong>${formatDrawOdds(odds)}</strong></div><div><span>2</span><strong>${formatOdds(odds?.awayTeamOdds)}</strong></div></div></section>`}
-      ${mainTab === "h2h" && html`<section className="match-section"><h3>Tête-à-tête ESPN</h3><${GamesList} games=${summary?.headToHeadGames || []} /></section>`}
-      ${mainTab === "standings" && html`<section className="match-section"><h3>Classements ESPN</h3><${StandingsList} standings=${standings} /></section>`}
-      ${mainTab === "news" && html`<section className="match-section"><h3>Actualités ESPN</h3><${MatchNewsList} news=${matchNews} /></section>`}
+      ${mainTab === "h2h" && html`<section className="match-section"><h3>Tête-à-tête</h3><${GamesList} games=${summary?.headToHeadGames || []} /></section>`}
+      ${mainTab === "standings" && html`<section className="match-section"><h3>Classements</h3><${StandingsList} standings=${standings} /></section>`}
+      ${mainTab === "news" && html`<section className="match-section"><h3>Actualités</h3><${MatchNewsList} news=${matchNews} /></section>`}
     </main>
   `;
 }
@@ -1451,7 +1460,7 @@ function formatMatchDate(date) {
 }
 
 function formatNewsDate(date) {
-  if (!date) return "Date ESPN indisponible";
+  if (!date) return "Date indisponible";
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(date));
 }
 
@@ -1465,7 +1474,7 @@ function formatDrawOdds(odds) {
 
 function StatsTable({ home, away, homeName, awayName }) {
   const rows = (away.length ? away : home).slice(0, 8);
-  if (!rows.length) return html`<p className="muted">Stats ESPN indisponibles pour ce match.</p>`;
+  if (!rows.length) return html`<p className="muted">Stats indisponibles pour ce match.</p>`;
   return html`<div className="stats-table"><div className="stats-head"><strong>${awayName}</strong><strong>${homeName}</strong></div>${rows.map((row) => {
     const homeRow = home.find((item) => item.name === row.name || item.label === row.label) || {};
     const awayValue = row.displayValue || row.value || "0";
@@ -1475,29 +1484,29 @@ function StatsTable({ home, away, homeName, awayName }) {
 }
 
 function RosterList({ rosters }) {
-  if (!rosters.length) return html`<p className="muted">Compositions ESPN indisponibles pour ce match.</p>`;
+  if (!rosters.length) return html`<p className="muted">Compositions indisponibles pour ce match.</p>`;
   return html`<div className="real-list">${rosters.map((team) => html`<section><h4>${team.team?.displayName || "Equipe"}</h4>${(team.roster || []).slice(0, 16).map((player) => html`<p>${player.athlete?.displayName || player.displayName || "Joueur"} <span>${player.position?.abbreviation || ""}</span></p>`)}</section>`)}</div>`;
 }
 
 function LeadersList({ leaders }) {
-  if (!leaders.length) return html`<p className="muted">Stats joueurs ESPN indisponibles pour ce match.</p>`;
+  if (!leaders.length) return html`<p className="muted">Stats joueurs indisponibles pour ce match.</p>`;
   return html`<div className="real-list">${leaders.map((team) => html`<section><h4>${team.team?.displayName || "Equipe"}</h4>${(team.leaders || []).map((group) => html`<p><strong>${translateStatLabel(group.displayName || group.name)}</strong> ${(group.leaders || []).map((item) => `${item.athlete?.displayName || ""} ${item.displayValue || ""}`).join(" / ")}</p>`)}</section>`)}</div>`;
 }
 
 function GamesList({ games }) {
-  if (!games.length) return html`<p className="muted">Tête-à-tête ESPN indisponible pour ce match.</p>`;
-  return html`<div className="real-list">${games.slice(0, 8).map((game) => html`<p><strong>${formatMatchDate((game.gameDate || game.date || "").slice(0, 10))}</strong> ${game.name || game.shortName || "Match ESPN"}</p>`)}</div>`;
+  if (!games.length) return html`<p className="muted">Tête-à-tête indisponible pour ce match.</p>`;
+  return html`<div className="real-list">${games.slice(0, 8).map((game) => html`<p><strong>${formatMatchDate((game.gameDate || game.date || "").slice(0, 10))}</strong> ${game.name || game.shortName || "Match"}</p>`)}</div>`;
 }
 
 function StandingsList({ standings }) {
   const rows = Array.isArray(standings) ? standings : [];
-  if (!rows.length) return html`<p className="muted">Classement ESPN indisponible pour ce match.</p>`;
+  if (!rows.length) return html`<p className="muted">Classement indisponible pour ce match.</p>`;
   return html`<div className="real-list">${rows.slice(0, 12).map((entry) => html`<p><strong>${entry.team?.displayName || entry.team || entry.name || "Equipe"}</strong> ${entry.stats?.map((stat) => `${translateStatLabel(stat.name)}: ${stat.displayValue}`).join(" · ") || ""}</p>`)}</div>`;
 }
 
 function MatchNewsList({ news }) {
   const items = Array.isArray(news) ? news : [];
-  if (!items.length) return html`<p className="muted">Actualités ESPN indisponibles pour ce match.</p>`;
+  if (!items.length) return html`<p className="muted">Actualités indisponibles pour ce match.</p>`;
   return html`<div className="real-list">${items.slice(0, 8).map((item) => html`<p><strong>${item.headline || item.title}</strong> ${item.description || ""}</p>`)}</div>`;
 }
 
@@ -1508,11 +1517,11 @@ function Footer({ navigate, sport, matches, news }) {
   const footballItems = sport.id === "football" ? matches.slice(0, 10).map(matchLabel) : [];
   const directItems = matches.slice(0, 10).map(matchLabel);
   const footerColumns = [
-    ["CDM 2026", ...filledItems(worldCupItems, "Aucun match ESPN chargé")],
+    ["CDM 2026", ...filledItems(worldCupItems, "Aucun match chargé")],
     ["Populaire", ...filledItems(popularItems, "Aucune compétition chargée")],
-    ["Livescore", ...filledItems(liveItems, "Aucun live ESPN chargé")],
+    ["Livescore", ...filledItems(liveItems, "Aucun live chargé")],
     ["Football Live", ...filledItems(footballItems, "Selectionne Football")],
-    ["Match en direct", ...filledItems(directItems, "Aucun match ESPN chargé")],
+    ["Match en direct", ...filledItems(directItems, "Aucun match chargé")],
   ];
   const legalLeft = ["Conditions d'utilisation", "Politique de confidentialité", "RGPD et journalisme", "Impressum", "Publicité", "Contact"];
   const legalRight = ["Mobile", "Livescore", "Sites recommandes", "FAQ", "Audio", "Bonus de paris sportifs"];
