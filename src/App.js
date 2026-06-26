@@ -912,7 +912,6 @@ function App() {
       <${HeroBanner} sport=${sport} matches=${matches} navigate=${navigate} />
       <${SportsBar} navId=${navId} setSportId=${changeSport} />
       ${route.view === "scores" && sport.id === "football" && html`<${FootballNewsStrip} news=${news} navigate=${navigate} />`}
-      ${route.view === "scores" && sport.id === "football" && html`<${ApiSportsConfig} apiKey=${apiSportsKey} setApiKey=${setApiSportsKey} />`}
       ${route.view === "news" && html`<${NewsPage} sport=${sport} news=${news} navigate=${navigate} />`}
       ${route.view === "article" && html`<${ArticlePage} article=${currentArticle} sport=${sport} navigate=${navigate} />`}
       ${route.view === "match" && html`<${MatchPage} match=${currentMatch} navigate=${navigate} apiSportsKey=${apiSportsKey} />`}
@@ -1004,31 +1003,6 @@ function FootballNewsStrip({ news, navigate }) {
   `;
 }
 
-function ApiSportsConfig({ apiKey, setApiKey }) {
-  const [draft, setDraft] = useState(apiKey);
-  useEffect(() => setDraft(apiKey), [apiKey]);
-  const saveKey = () => setApiKey(draft.trim());
-  const clearKey = () => {
-    localStorage.removeItem(API_SPORTS_KEY_STORAGE);
-    setDraft("");
-    setApiKey("");
-  };
-  return html`
-    <section className=${`api-sports-config ${apiKey ? "connected" : ""}`}>
-      <div>
-        <strong>${apiKey ? "Football API-SPORTS actif" : "Clé API-SPORTS requise pour tous les matchs football"}</strong>
-        <span>${apiKey ? "Le football charge /fixtures API-SPORTS pour tous les pays et ligues du jour." : "Colle la clé x-apisports-key pour remplacer ESPN sur Football et Coupe du Monde."}</span>
-      </div>
-      <label>
-        <span>x-apisports-key</span>
-        <input value=${draft} onInput=${(event) => setDraft(event.target.value)} type="password" placeholder="Colle ta clé API-SPORTS" />
-      </label>
-      <button type="button" className="liquid-button active" onClick=${saveKey}>Activer</button>
-      ${apiKey && html`<button type="button" className="liquid-button" onClick=${clearKey}>Retirer</button>`}
-    </section>
-  `;
-}
-
 function SportIcon({ id }) {
   if (id === "world-cup") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v3.5c0 3.1-1.7 5.2-4 5.2s-4-2.1-4-5.2V4Z" /><path d="M8 6H5.5c0 3 .9 4.7 3.2 5.3M16 6h2.5c0 3-.9 4.7-3.2 5.3M12 12.7V17M8.8 20h6.4M10 17h4" /><circle className="cup-dot" cx="17.4" cy="5.2" r="1.8" /></svg>`;
   if (id === "basketball") return html`<svg className="sport-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.8 12h16.4M12 3.5v17M5.8 6.2c3 2.4 4.6 5.9 4.7 10.8M18.2 6.2c-3 2.4-4.6 5.9-4.7 10.8" /></svg>`;
@@ -1089,14 +1063,17 @@ function Scoreboard({ matches, favorites, toggleFavorite, openMatch }) {
   const [expandedGroups, setExpandedGroups] = useState({});
   const groups = groupByCompetition(matches);
   const compactMode = matches.some((match) => match.source === "API-SPORTS");
-  const toggleGroup = (key) => setExpandedGroups((items) => ({ ...items, [key]: !items[key] }));
+  const toggleGroup = (key, defaultOpen = false) => setExpandedGroups((items) => ({ ...items, [key]: !(items[key] ?? defaultOpen) }));
   if (!groups.length) return html`<div className="match-list"><section className="competition"><div className="competition-head"><span>Aucun match</span></div><div className="empty-match-row">Aucun match ESPN pour ce filtre.</div></section></div>`;
-  return html`<div className="match-list">${groups.map(([key, items]) => {
-    const isOpen = !compactMode || expandedGroups[key];
-    return html`<section className=${`competition ${compactMode ? "compact-competition" : ""}`} key=${key}>
+  return html`<div className="match-list">${groups.map(([key, items], index) => {
+    const normalizedCompetition = normalizePlain(items[0].competition.label);
+    const isWorldCup = normalizedCompetition.includes("championnat du monde") || normalizedCompetition.includes("coupe du monde");
+    const defaultOpen = compactMode && (isWorldCup || index < 6);
+    const isOpen = !compactMode || (expandedGroups[key] ?? defaultOpen);
+    return html`<section className=${`competition ${compactMode ? "compact-competition" : ""} ${isOpen ? "open-competition" : ""}`} key=${key}>
       <div className="competition-head">
         <span className="competition-main"><button className="star-btn header-star" type="button">☆</button><${Flag} code=${items[0].competition.flag} /><strong>${items[0].competition.country.toUpperCase()}: ${items[0].competition.label}</strong><span className="pin-mark">●</span></span>
-        ${compactMode ? html`<button className="compact-toggle" type="button" onClick=${() => toggleGroup(key)}>${isOpen ? "Masquer matchs" : `Afficher matchs (${items.length})`}</button>` : html`<button className="standings-link" type="button">Classement Live ˄</button>`}
+        ${compactMode ? html`<button className="compact-toggle" type="button" onClick=${() => toggleGroup(key, defaultOpen)}>${isOpen ? "Masquer matchs" : `Afficher matchs (${items.length})`}</button>` : html`<button className="standings-link" type="button">Classement Live ˄</button>`}
       </div>
       ${isOpen && items.map((match) => html`<${MatchRow} key=${match.id} match=${match} favorite=${favorites.includes(match.id)} toggleFavorite=${toggleFavorite} openMatch=${openMatch} />`)}
     </section>`;
