@@ -166,6 +166,74 @@ function uniqueMatches(matches) {
   return [...new Map(matches.map((match) => [match.id, match])).values()];
 }
 
+function liveProgress(status) {
+  const minute = Number.parseInt(String(status || "").match(/\d+/)?.[0] || "0", 10);
+  if (!minute) return 4;
+  return Math.max(4, Math.min(100, Math.round((minute / 90) * 100)));
+}
+
+function translateStatus(value) {
+  const text = String(value || "");
+  return text
+    .replace(/^FT$/i, "Terminé")
+    .replace(/^HT$/i, "Mi-temps")
+    .replace(/Halftime/i, "Mi-temps")
+    .replace(/Final/i, "Terminé")
+    .replace(/Full Time/i, "Terminé")
+    .replace(/Scheduled/i, "Prévu")
+    .replace(/Postponed/i, "Reporté")
+    .replace(/Canceled/i, "Annulé")
+    .replace(/Thu, /i, "Jeu. ")
+    .replace(/Fri, /i, "Ven. ")
+    .replace(/Sat, /i, "Sam. ")
+    .replace(/Sun, /i, "Dim. ")
+    .replace(/Mon, /i, "Lun. ")
+    .replace(/Tue, /i, "Mar. ")
+    .replace(/Wed, /i, "Mer. ")
+    .replace(/June/i, "juin")
+    .replace(/July/i, "juillet")
+    .replace(/at/i, "à");
+}
+
+function translateText(value) {
+  const text = String(value || "");
+  return text
+    .replace(/First Half begins\./gi, "Début de la première mi-temps.")
+    .replace(/Second Half begins\./gi, "Début de la deuxième mi-temps.")
+    .replace(/Match ends,/gi, "Fin du match,")
+    .replace(/Goal!/gi, "But !")
+    .replace(/Foul by/gi, "Faute de")
+    .replace(/wins a free kick/gi, "obtient un coup franc")
+    .replace(/yellow card/gi, "carton jaune")
+    .replace(/red card/gi, "carton rouge")
+    .replace(/Substitution,/gi, "Remplacement,")
+    .replace(/Delay in match/gi, "Arrêt du jeu")
+    .replace(/Delay over\. They are ready to continue\./gi, "Fin de l'arrêt. Le jeu peut reprendre.")
+    .replace(/right footed shot/gi, "frappe du pied droit")
+    .replace(/left footed shot/gi, "frappe du pied gauche")
+    .replace(/header/gi, "tête")
+    .replace(/Assisted by/gi, "Passe décisive de")
+    .replace(/from the centre of the box/gi, "depuis l'axe de la surface")
+    .replace(/from outside the box/gi, "depuis l'extérieur de la surface")
+    .replace(/to the bottom left corner/gi, "dans le coin inférieur gauche")
+    .replace(/to the bottom right corner/gi, "dans le coin inférieur droit");
+}
+
+function translateStatLabel(value) {
+  const labels = {
+    shotsTotal: "Tirs",
+    shotsOnTarget: "Tirs cadrés",
+    possessionPct: "Possession",
+    foulsCommitted: "Fautes",
+    yellowCards: "Cartons jaunes",
+    redCards: "Cartons rouges",
+    cornerKicks: "Corners",
+    saves: "Arrêts",
+    offsides: "Hors-jeu",
+  };
+  return labels[value] || translateText(value);
+}
+
 function newsUrl(sport) {
   return `${ESPN_BASE}/${sport.newsPath}/news`;
 }
@@ -282,7 +350,7 @@ function App() {
         setMatches(espnMatches);
         setNews(nextNews);
         setLastUpdated(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-        setLoadingLabel(`${espnMatches.length} match(s) affiches - ${sport.leagues.length - failed}/${sport.leagues.length} competitions ESPN chargees`);
+        setLoadingLabel(`${espnMatches.length} match(s) affichés - ${sport.leagues.length - failed}/${sport.leagues.length} compétitions ESPN chargées`);
       }
     }
     load();
@@ -371,11 +439,11 @@ function Topbar({ query, setQuery, route, navigate }) {
         <span><strong>Foot Live</strong><small>Scores, calendriers, actus</small></span>
       </button>
       <nav className="main-links" aria-label="Navigation principale">
-        <button className=${`main-link liquid-button ${route.view === "scores" ? "active" : ""}`} onClick=${() => navigate("scores")}>Resultats</button>
-        <button className=${`main-link liquid-button ${route.view === "news" || route.view === "article" ? "active" : ""}`} onClick=${() => navigate("news")}>Actualites</button>
+        <button className=${`main-link liquid-button ${route.view === "scores" ? "active" : ""}`} onClick=${() => navigate("scores")}>Résultats</button>
+        <button className=${`main-link liquid-button ${route.view === "news" || route.view === "article" ? "active" : ""}`} onClick=${() => navigate("news")}>Actualités</button>
         <button className=${`main-link liquid-button ${route.view === "favorites" ? "active" : ""}`} onClick=${() => navigate("favorites")}>Favoris</button>
       </nav>
-      <label className="search"><span>Search</span><input value=${query} onInput=${(event) => setQuery(event.target.value)} type="search" placeholder="Rechercher equipe, pays, competition" /></label>
+      <label className="search"><span>Recherche</span><input value=${query} onInput=${(event) => setQuery(event.target.value)} type="search" placeholder="Rechercher équipe, pays, compétition" /></label>
     </header>
   `;
 }
@@ -387,14 +455,14 @@ function HeroBanner({ sport, matches, navigate }) {
     <section className="hero-banner">
       <div className="hero-copy">
         <p className="eyebrow">Interface livescore premium</p>
-        <h1>Scores propres, actus internes, competitions ordonnees.</h1>
-        <p>Tableau de bord sportif React inspire de la structure Flashscore, avec une vraie page actualites et des controles utiles.</p>
+        <h1>Scores propres, actus internes, compétitions ordonnées.</h1>
+        <p>Tableau de bord sportif React inspiré de la structure Flashscore, avec une vraie page actualités et des contrôles utiles.</p>
         <div className="hero-actions">
           <button className="liquid-button active" onClick=${() => navigate("scores")}>Voir les scores</button>
-          <button className="liquid-button ghost" onClick=${() => navigate("news")}>Lire les actualites</button>
+          <button className="liquid-button ghost" onClick=${() => navigate("news")}>Lire les actualités</button>
         </div>
       </div>
-      <div className="hero-card"><span>${sport.label}</span><strong>${matches.length}</strong><small>${live} live / ${scheduled} a venir</small></div>
+      <div className="hero-card"><span>${sport.label}</span><strong>${matches.length}</strong><small>${live} live / ${scheduled} à venir</small></div>
     </section>
   `;
 }
@@ -426,8 +494,8 @@ function LeftPanel({ sport, matches, favorites, openMatch, selectSearch }) {
   const countries = [...new Map(sport.leagues.map((item) => [item.country, item])).values()];
   return html`
     <aside className="left-panel">
-      <section className="panel"><h2>Ligues epinglees</h2><div className="stack">${sport.leagues.filter((item) => item.pinned).map((item) => html`<${LeagueButton} key=${item.id} league=${item} count=${countForLeague(matches, item.id)} onClick=${() => selectSearch(item.label)} />`)}</div></section>
-      <section className="panel"><h2>Mes equipes</h2>${favorites.length ? html`<div className="stack">${favorites.map((match) => html`<button className="favorite-row" onClick=${() => openMatch(match)}><strong>${match.away.name} - ${match.home.name}</strong><span>${match.status}</span></button>`)}</div>` : html`<p className="muted">Clique sur une etoile pour ajouter un match.</p>`}</section>
+      <section className="panel"><h2>Ligues épinglées</h2><div className="stack">${sport.leagues.filter((item) => item.pinned).map((item) => html`<${LeagueButton} key=${item.id} league=${item} count=${countForLeague(matches, item.id)} onClick=${() => selectSearch(item.label)} />`)}</div></section>
+      <section className="panel"><h2>Mes équipes</h2>${favorites.length ? html`<div className="stack">${favorites.map((match) => html`<button className="favorite-row" onClick=${() => openMatch(match)}><strong>${match.away.name} - ${match.home.name}</strong><span>${match.status}</span></button>`)}</div>` : html`<p className="muted">Clique sur une étoile pour ajouter un match.</p>`}</section>
       <section className="panel standings-panel"><h2>Classements</h2><div className="country-list">${countries.map((item) => html`<button className="country-link" onClick=${() => selectSearch(item.country)}><span className="country-main"><${Flag} code=${item.flag} /><strong>${item.country}</strong></span><span className="count-pill">${sport.leagues.filter((league) => league.country === item.country).length}</span></button>`)}</div></section>
     </aside>
   `;
@@ -447,17 +515,17 @@ function ScoreHeader({ filter, setFilter, date, setDate }) {
   const tabs = [
     ["all", "Tous"],
     ["live", "Direct"],
-    ["odds", "Cotes"],
-    ["finished", "Termines"],
-    ["scheduled", "Prevus"],
+    ["odds", "Côtes"],
+    ["finished", "Terminés"],
+    ["scheduled", "Prévus"],
   ];
   return html`
     <div className="score-header">
       <div className="tabs-row">${tabs.map(([id, label]) => html`<button className=${`tab ${filter === id ? "active" : ""}`} onClick=${() => setFilter(id)} type="button">${label}</button>`)}</div>
       <div className="date-controls">
-        <button className="date-arrow" onClick=${() => shiftDate(-1)} type="button" aria-label="Jour precedent">‹</button>
-        <label className="date-picker"><span>▦</span><input value=${date} onChange=${(event) => setDate(event.target.value)} type="date" /><strong>${label}</strong></label>
-        <button className="date-arrow" onClick=${() => shiftDate(1)} type="button" aria-label="Jour suivant">›</button>
+        <button className="date-arrow" onClick=${() => shiftDate(-1)} type="button" aria-label="Jour précédent">${"\u2039"}</button>
+        <label className="date-picker"><span className="calendar-mark">${"\u25a6"}</span><input className="date-input" value=${date} onChange=${(event) => setDate(event.target.value)} type="date" /><strong>${label}</strong></label>
+        <button className="date-arrow" onClick=${() => shiftDate(1)} type="button" aria-label="Jour suivant">${"\u203a"}</button>
       </div>
     </div>
   `;
@@ -470,11 +538,12 @@ function Scoreboard({ matches, favorites, toggleFavorite, openMatch }) {
 }
 
 function MatchRow({ match, favorite, toggleFavorite, openMatch }) {
-  const minute = match.state === "in" ? match.status : match.state === "post" ? "FT" : match.status;
+  const minute = match.state === "in" ? translateStatus(match.status) : match.state === "post" ? "Terminé" : translateStatus(match.status);
   const showPreview = match.state !== "in" && match.state !== "post";
+  const style = match.state === "in" ? { "--live-progress": `${liveProgress(match.status)}%` } : {};
   return html`
-    <div className="match-row">
-      <button className=${`star-btn ${favorite ? "active" : ""}`} onClick=${() => toggleFavorite(match.id)} type="button">☆</button>
+    <div className=${`match-row ${match.state === "in" ? "live-row" : ""}`} style=${style}>
+      <button className=${`star-btn ${favorite ? "active" : ""}`} onClick=${() => toggleFavorite(match.id)} type="button">${"\u2606"}</button>
       <button className=${`time-cell ${match.state === "in" ? "live" : ""}`} onClick=${() => openMatch(match)} type="button">${minute}</button>
       <div className="teams-stack" onClick=${() => openMatch(match)} role="button" tabIndex="0">
         <${TeamLine} team=${match.away} />
@@ -484,8 +553,7 @@ function MatchRow({ match, favorite, toggleFavorite, openMatch }) {
         <span className=${`score ${match.away.winner ? "winner" : ""}`}>${match.away.score}</span>
         <span className=${`score ${match.home.winner ? "winner" : ""}`}>${match.home.score}</span>
       </div>
-      <div className="preview-cell">${showPreview && html`<span>PREVIEW</span>`}</div>
-      <div className="match-actions"><button type="button" aria-label="Audio">♬</button><button type="button" aria-label="TV">▱</button><button type="button" aria-label="Stats">♜</button><button className="bet-btn" type="button">BET›</button></div>
+      <div className="preview-cell">${showPreview && html`<span>AVANT-MATCH</span>`}</div>
     </div>
   `;
 }
@@ -504,45 +572,43 @@ function RightPanel({ sport, news, matches, openNews, navigate, selectSearch }) 
   const live = matches.filter((match) => match.state === "in").length;
   const finished = matches.filter((match) => match.state === "post").length;
   const scheduled = matches.filter((match) => match.state !== "in" && match.state !== "post").length;
-  return html`<aside className="right-panel"><section className="panel news-panel"><div className="panel-heading-row"><h2>Actualites</h2><button className="panel-link" onClick=${() => navigate("news")}>Tout voir</button></div><div className="news-list">${news.slice(0, 5).map((item) => html`<button className="news-card" onClick=${() => openNews(item)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="team-logo"></div>`}<span><strong>${item.title}</strong><small>${item.description || "Lire dans Foot Live"}</small></span></button>`)}</div></section><section className="panel data-panel"><h2>Infos du jour</h2><div className="data-grid"><div><strong>${matches.length}</strong><span>matchs charges</span></div><div><strong>${live}</strong><span>live</span></div><div><strong>${finished}</strong><span>termines</span></div><div><strong>${scheduled}</strong><span>a venir</span></div></div></section><section className="panel"><h2>Top competitions</h2><div className="stack">${sport.leagues.slice(0, 8).map((item) => html`<button className="top-row" onClick=${() => selectSearch(item.label)}><span className="top-main"><${Flag} code=${item.flag} /><strong>${item.label}</strong></span><span className="count-pill">${countForLeague(matches, item.id)}</span></button>`)}</div></section></aside>`;
+  return html`<aside className="right-panel"><section className="panel news-panel"><div className="panel-heading-row"><h2>Actualités</h2><button className="panel-link" onClick=${() => navigate("news")}>Tout voir</button></div><div className="news-list">${news.slice(0, 5).map((item) => html`<button className="news-card" onClick=${() => openNews(item)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="team-logo"></div>`}<span><strong>${item.title}</strong><small>${item.description || "Lire dans Foot Live"}</small></span></button>`)}</div></section><section className="panel data-panel"><h2>Infos du jour</h2><div className="data-grid"><div><strong>${matches.length}</strong><span>matchs chargés</span></div><div><strong>${live}</strong><span>live</span></div><div><strong>${finished}</strong><span>terminés</span></div><div><strong>${scheduled}</strong><span>à venir</span></div></div></section><section className="panel"><h2>Top compétitions</h2><div className="stack">${sport.leagues.slice(0, 8).map((item) => html`<button className="top-row" onClick=${() => selectSearch(item.label)}><span className="top-main"><${Flag} code=${item.flag} /><strong>${item.label}</strong></span><span className="count-pill">${countForLeague(matches, item.id)}</span></button>`)}</div></section></aside>`;
 }
 
 function NewsPage({ sport, news, navigate }) {
-  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">${sport.label}</p><h1>Actualites sportives</h1><p>Articles consultables directement dans Foot Live, sans ouvrir ESPN dans un onglet externe.</p></section>${news.length ? html`<div className="news-grid">${news.map((item) => html`<button className="article-card" key=${item.id} onClick=${() => navigate("article", item.id)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="article-fallback">FL</div>`}<span><small>${sport.label}</small><strong>${item.title}</strong><p>${item.description || "Lire l'article complet dans le site."}</p></span></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucune actualite ESPN chargee</h2><p>Le site n'affiche pas d'actualite locale inventee.</p></div>`}</main>`;
+  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">${sport.label}</p><h1>Actualités sportives</h1><p>Articles consultables directement dans Foot Live, sans ouvrir ESPN dans un onglet externe.</p></section>${news.length ? html`<div className="news-grid">${news.map((item) => html`<button className="article-card" key=${item.id} onClick=${() => navigate("article", item.id)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="article-fallback">FL</div>`}<span><small>${sport.label}</small><strong>${item.title}</strong><p>${item.description || "Lire l'article complet dans le site."}</p></span></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucune actualité ESPN chargée</h2><p>Le site n'affiche pas d'actualité locale inventée.</p></div>`}</main>`;
 }
 
 function ArticlePage({ article, sport, navigate }) {
-  if (!article) return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualites</button><div className="empty-panel"><h2>Aucun article ESPN charge</h2><p>Le site n'affiche pas de faux article local.</p></div></main>`;
-  return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualites</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualite</p><h1>${article.title}</h1>${article.image && html`<img className="article-hero" src=${article.image} alt="" />`}<p className="article-lead">${article.description || ""}</p><p>${article.body || article.description || "Article affiche directement dans Foot Live."}</p></article></main>`;
+  if (!article) return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><div className="empty-panel"><h2>Aucun article ESPN chargé</h2><p>Le site n'affiche pas de faux article local.</p></div></main>`;
+  return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualité</p><h1>${article.title}</h1>${article.image && html`<img className="article-hero" src=${article.image} alt="" />`}<p className="article-lead">${article.description || ""}</p><p>${article.body || article.description || "Article affiché directement dans Foot Live."}</p></article></main>`;
 }
 
 function FavoritesPage({ favorites, navigate, openMatch }) {
-  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">Favoris</p><h1>Mes matchs suivis</h1><p>Les favoris restent dans le navigateur, sans connexion client.</p></section>${favorites.length ? html`<div className="favorite-page-grid">${favorites.map((match) => html`<button className="favorite-large-card" onClick=${() => openMatch(match)}><span>${match.competition.label}</span><strong>${match.away.name} - ${match.home.name}</strong><small>${match.status}</small></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucun favori</h2><p>Retourne aux scores et clique sur une etoile pour ajouter un match.</p><button className="liquid-button active" onClick=${() => navigate("scores")}>Voir les scores</button></div>`}</main>`;
-}
-
-function MatchModal({ match, onClose }) {
-  return html`<div className="modal-backdrop"><div className="dialog dialog-open"><div className="dialog-card"><div className="dialog-top"><div><p className="eyebrow">${match.competition.country}: ${match.competition.label}</p><h2>${match.away.name} - ${match.home.name}</h2></div><button className="close-dialog" onClick=${onClose}>x</button></div><div className="dialog-score"><div className="dialog-team"><${TeamCell} team=${match.away} /><span>${match.away.name}</span></div><div className="dialog-total">${match.away.score} - ${match.home.score}</div><div className="dialog-team"><${TeamCell} team=${match.home} /><span>${match.home.name}</span></div></div><p><strong>Statut:</strong> ${match.status}</p><p><strong>Source:</strong> ${match.source}</p><p><strong>Lieu:</strong> ${match.venue || "Non renseigne"}</p></div></div></div>`;
+  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">Favoris</p><h1>Mes matchs suivis</h1><p>Les favoris restent dans le navigateur, sans connexion client.</p></section>${favorites.length ? html`<div className="favorite-page-grid">${favorites.map((match) => html`<button className="favorite-large-card" onClick=${() => openMatch(match)}><span>${match.competition.label}</span><strong>${match.away.name} - ${match.home.name}</strong><small>${match.status}</small></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucun favori</h2><p>Retourne aux scores et clique sur une étoile pour ajouter un match.</p><button className="liquid-button active" onClick=${() => navigate("scores")}>Voir les scores</button></div>`}</main>`;
 }
 
 function MatchPage({ match, navigate }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState("");
+  const [mainTab, setMainTab] = useState("match");
+  const [subTab, setSubTab] = useState("summary");
 
   useEffect(() => {
     let cancelled = false;
     async function loadSummary() {
       if (!match) return;
-      setLoading("Chargement du resume ESPN...");
+          setLoading("Chargement du résumé ESPN...");
       try {
         const payload = await fetchJson(summaryUrl(match));
         if (!cancelled) {
           setSummary(payload);
-          setLoading("Resume ESPN charge en temps reel");
+          setLoading("Résumé ESPN chargé en temps réel");
         }
       } catch {
         if (!cancelled) {
           setSummary(null);
-          setLoading("Resume ESPN indisponible pour ce match");
+          setLoading("Résumé ESPN indisponible pour ce match");
         }
       }
     }
@@ -554,7 +620,7 @@ function MatchPage({ match, navigate }) {
     };
   }, [match?.id]);
 
-  if (!match) return html`<main className="page-shell match-page"><button className="liquid-button ghost back-button" onClick=${() => navigate("scores")}>Retour aux scores</button><div className="empty-panel"><h2>Match introuvable</h2><p>Retourne aux scores et ouvre un match charge depuis ESPN.</p></div></main>`;
+  if (!match) return html`<main className="page-shell match-page"><button className="liquid-button ghost back-button" onClick=${() => navigate("scores")}>Retour aux scores</button><div className="empty-panel"><h2>Match introuvable</h2><p>Retourne aux scores et ouvre un match chargé depuis ESPN.</p></div></main>`;
 
   const competition = summary?.header?.competitions?.[0] || {};
   const competitors = competition.competitors || [];
@@ -562,16 +628,34 @@ function MatchPage({ match, navigate }) {
   const awaySummary = competitors.find((item) => item.homeAway === "away");
   const homeScore = homeSummary?.score ?? match.home.score;
   const awayScore = awaySummary?.score ?? match.away.score;
-  const status = summary?.header?.competitions?.[0]?.status?.type?.shortDetail || match.status;
+  const status = translateStatus(summary?.header?.competitions?.[0]?.status?.type?.shortDetail || match.status);
   const commentary = (summary?.commentary || []).slice(-8).reverse();
   const keyEvents = (summary?.keyEvents || []).filter((item) => item.text).slice(-6).reverse();
   const odds = summary?.odds?.[0] || null;
   const stats = summary?.boxscore?.teams || [];
   const homeStats = stats.find((item) => item.team?.displayName === match.home.name)?.statistics || [];
   const awayStats = stats.find((item) => item.team?.displayName === match.away.name)?.statistics || [];
+  const rosters = summary?.rosters || [];
+  const leaders = summary?.leaders || [];
+  const standings = summary?.standings?.entries || summary?.standings || [];
+  const matchNews = summary?.news || [];
+  const mainTabs = [
+    ["match", "Match"],
+    ["odds", "Côtes"],
+    ["h2h", "TàT"],
+    ["standings", "Classements"],
+    ["news", "Actualités"],
+  ];
+  const subTabs = [
+    ["summary", "Résumé"],
+    ["stats", "Stats"],
+    ["lineups", "Compos"],
+    ["players", "Stats joueurs"],
+    ["comments", "Commentaires"],
+  ];
   return html`
     <main className="page-shell match-page">
-      <div className="match-breadcrumb"><button onClick=${() => navigate("scores")} type="button">Football</button><span>›</span><span>${match.competition.country}</span><span>›</span><strong>${match.competition.label}</strong><button className="new-window-btn" type="button">Nouvelle fenetre</button></div>
+      <div className="match-breadcrumb"><button onClick=${() => navigate("scores")} type="button">Football</button><span>${"\u203a"}</span><span>${match.competition.country}</span><span>${"\u203a"}</span><strong>${match.competition.label}</strong><button className="new-window-btn" type="button">Nouvelle fenêtre</button></div>
       <section className="match-hero">
         <button className="star-btn" type="button">☆</button>
         <div className="match-team-card"><${TeamBadge} team=${match.away} /><strong>${match.away.name}</strong><span>${match.away.code || ""}</span></div>
@@ -579,12 +663,17 @@ function MatchPage({ match, navigate }) {
         <div className="match-team-card"><${TeamBadge} team=${match.home} /><strong>${match.home.name}</strong><span>${match.home.code || ""}</span></div>
         <button className="star-btn" type="button">☆</button>
       </section>
-      <nav className="match-tabs"><button className="active">Match</button><button>Cotes</button><button>Tat</button><button>Classements</button><button>Actualites</button></nav>
-      <div className="match-subtabs"><button className="active">Resume</button><button>Stats</button><button>Compos</button><button>Stats joueurs</button><button>Commentaires</button></div>
-      <section className="match-section"><h3>Resume ESPN</h3>${keyEvents.length ? keyEvents.map((item) => html`<div className="event-line"><span>${item.clock?.displayValue || ""}</span><p>${item.text}</p></div>`) : html`<p className="muted">Aucun evenement cle ESPN charge.</p>`}</section>
-      <section className="match-section"><h3>Commentaires</h3>${commentary.length ? commentary.map((item) => html`<div className="comment-line"><strong>${item.time?.displayValue || ""}</strong><p>${item.text}</p></div>`) : html`<p className="muted">Aucun commentaire ESPN charge.</p>`}</section>
-      <section className="match-section odds-section"><h3>Cotes ${odds?.provider?.name ? html`<span>${odds.provider.name}</span>` : ""}</h3><div className="odds-grid"><div><span>1</span><strong>${formatOdds(odds?.homeTeamOdds)}</strong></div><div><span>X</span><strong>${formatDrawOdds(odds)}</strong></div><div><span>2</span><strong>${formatOdds(odds?.awayTeamOdds)}</strong></div></div></section>
-      <section className="match-section"><h3>Stats ESPN</h3><${StatsTable} home=${homeStats} away=${awayStats} homeName=${match.home.name} awayName=${match.away.name} /></section>
+      <nav className="match-tabs">${mainTabs.map(([id, label]) => html`<button className=${mainTab === id ? "active" : ""} onClick=${() => setMainTab(id)} type="button">${label}</button>`)}</nav>
+      ${mainTab === "match" && html`<div className="match-subtabs">${subTabs.map(([id, label]) => html`<button className=${subTab === id ? "active" : ""} onClick=${() => setSubTab(id)} type="button">${label}</button>`)}</div>`}
+      ${mainTab === "match" && subTab === "summary" && html`<section className="match-section"><h3>Résumé ESPN</h3>${keyEvents.length ? keyEvents.map((item) => html`<div className="event-line"><span>${item.clock?.displayValue || ""}</span><p>${translateText(item.text)}</p></div>`) : html`<p className="muted">Aucun événement clé ESPN chargé.</p>`}</section>`}
+      ${mainTab === "match" && subTab === "stats" && html`<section className="match-section"><h3>Stats ESPN</h3><${StatsTable} home=${homeStats} away=${awayStats} homeName=${match.home.name} awayName=${match.away.name} /></section>`}
+      ${mainTab === "match" && subTab === "lineups" && html`<section className="match-section"><h3>Compositions ESPN</h3><${RosterList} rosters=${rosters} /></section>`}
+      ${mainTab === "match" && subTab === "players" && html`<section className="match-section"><h3>Stats joueurs ESPN</h3><${LeadersList} leaders=${leaders} /></section>`}
+      ${mainTab === "match" && subTab === "comments" && html`<section className="match-section"><h3>Commentaires</h3>${commentary.length ? commentary.map((item) => html`<div className="comment-line"><strong>${item.time?.displayValue || ""}</strong><p>${translateText(item.text)}</p></div>`) : html`<p className="muted">Aucun commentaire ESPN chargé.</p>`}</section>`}
+      ${mainTab === "odds" && html`<section className="match-section odds-section"><h3>Côtes ${odds?.provider?.name ? html`<span>${odds.provider.name}</span>` : ""}</h3><div className="odds-grid"><div><span>1</span><strong>${formatOdds(odds?.homeTeamOdds)}</strong></div><div><span>X</span><strong>${formatDrawOdds(odds)}</strong></div><div><span>2</span><strong>${formatOdds(odds?.awayTeamOdds)}</strong></div></div></section>`}
+      ${mainTab === "h2h" && html`<section className="match-section"><h3>Tête-à-tête ESPN</h3><${GamesList} games=${summary?.headToHeadGames || []} /></section>`}
+      ${mainTab === "standings" && html`<section className="match-section"><h3>Classements ESPN</h3><${StandingsList} standings=${standings} /></section>`}
+      ${mainTab === "news" && html`<section className="match-section"><h3>Actualités ESPN</h3><${MatchNewsList} news=${matchNews} /></section>`}
     </main>
   `;
 }
@@ -595,6 +684,7 @@ function TeamBadge({ team }) {
 }
 
 function formatMatchDate(date) {
+  if (!date) return "";
   return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(`${date}T12:00:00`));
 }
 
@@ -613,8 +703,35 @@ function StatsTable({ home, away, homeName, awayName }) {
     const homeRow = home.find((item) => item.name === row.name || item.label === row.label) || {};
     const awayValue = row.displayValue || row.value || "0";
     const homeValue = homeRow.displayValue || homeRow.value || "0";
-    return html`<div className="stat-row"><span>${awayValue}</span><p>${row.label || row.name}</p><span>${homeValue}</span></div>`;
+    return html`<div className="stat-row"><span>${awayValue}</span><p>${translateStatLabel(row.name || row.label)}</p><span>${homeValue}</span></div>`;
   })}</div>`;
+}
+
+function RosterList({ rosters }) {
+  if (!rosters.length) return html`<p className="muted">Compositions ESPN indisponibles pour ce match.</p>`;
+  return html`<div className="real-list">${rosters.map((team) => html`<section><h4>${team.team?.displayName || "Equipe"}</h4>${(team.roster || []).slice(0, 16).map((player) => html`<p>${player.athlete?.displayName || player.displayName || "Joueur"} <span>${player.position?.abbreviation || ""}</span></p>`)}</section>`)}</div>`;
+}
+
+function LeadersList({ leaders }) {
+  if (!leaders.length) return html`<p className="muted">Stats joueurs ESPN indisponibles pour ce match.</p>`;
+  return html`<div className="real-list">${leaders.map((team) => html`<section><h4>${team.team?.displayName || "Equipe"}</h4>${(team.leaders || []).map((group) => html`<p><strong>${translateStatLabel(group.displayName || group.name)}</strong> ${(group.leaders || []).map((item) => `${item.athlete?.displayName || ""} ${item.displayValue || ""}`).join(" / ")}</p>`)}</section>`)}</div>`;
+}
+
+function GamesList({ games }) {
+  if (!games.length) return html`<p className="muted">Tête-à-tête ESPN indisponible pour ce match.</p>`;
+  return html`<div className="real-list">${games.slice(0, 8).map((game) => html`<p><strong>${formatMatchDate((game.gameDate || game.date || "").slice(0, 10))}</strong> ${game.name || game.shortName || "Match ESPN"}</p>`)}</div>`;
+}
+
+function StandingsList({ standings }) {
+  const rows = Array.isArray(standings) ? standings : [];
+  if (!rows.length) return html`<p className="muted">Classement ESPN indisponible pour ce match.</p>`;
+  return html`<div className="real-list">${rows.slice(0, 12).map((entry) => html`<p><strong>${entry.team?.displayName || entry.team || entry.name || "Equipe"}</strong> ${entry.stats?.map((stat) => `${translateStatLabel(stat.name)}: ${stat.displayValue}`).join(" · ") || ""}</p>`)}</div>`;
+}
+
+function MatchNewsList({ news }) {
+  const items = Array.isArray(news) ? news : [];
+  if (!items.length) return html`<p className="muted">Actualités ESPN indisponibles pour ce match.</p>`;
+  return html`<div className="real-list">${items.slice(0, 8).map((item) => html`<p><strong>${item.headline || item.title}</strong> ${item.description || ""}</p>`)}</div>`;
 }
 
 function Footer({ navigate, sport, matches, news }) {
@@ -624,13 +741,13 @@ function Footer({ navigate, sport, matches, news }) {
   const footballItems = sport.id === "football" ? matches.slice(0, 10).map(matchLabel) : [];
   const directItems = matches.slice(0, 10).map(matchLabel);
   const footerColumns = [
-    ["CDM 2026", ...filledItems(worldCupItems, "Aucun match ESPN charge")],
-    ["Populaire", ...filledItems(popularItems, "Aucune competition chargee")],
-    ["Livescore", ...filledItems(liveItems, "Aucun live ESPN charge")],
+    ["CDM 2026", ...filledItems(worldCupItems, "Aucun match ESPN chargé")],
+    ["Populaire", ...filledItems(popularItems, "Aucune compétition chargée")],
+    ["Livescore", ...filledItems(liveItems, "Aucun live ESPN chargé")],
     ["Football Live", ...filledItems(footballItems, "Selectionne Football")],
-    ["Match en direct", ...filledItems(directItems, "Aucun match ESPN charge")],
+    ["Match en direct", ...filledItems(directItems, "Aucun match ESPN chargé")],
   ];
-  const legalLeft = ["Conditions d'utilisation", "Politique de confidentialite", "RGPD et journalisme", "Impressum", "Publicite", "Contact"];
+  const legalLeft = ["Conditions d'utilisation", "Politique de confidentialité", "RGPD et journalisme", "Impressum", "Publicité", "Contact"];
   const legalRight = ["Mobile", "Livescore", "Sites recommandes", "FAQ", "Audio", "Bonus de paris sportifs"];
   const social = ["Facebook", "X", "Instagram", "TikTok"];
   return html`
@@ -655,7 +772,7 @@ function Footer({ navigate, sport, matches, news }) {
       <div className="footer-bottom">
         <button type="button" className="lite-link">Version lite</button>
         <p>Jeu responsable. Gambling Therapy. 18+</p>
-        <p>Copyright © 2026 Footlive.fr | Definir la confidentialite</p>
+        <p>Copyright © 2026 Footlive.fr | Définir la confidentialité</p>
       </div>
     </footer>
   `;
