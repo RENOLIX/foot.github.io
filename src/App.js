@@ -238,6 +238,102 @@ function newsUrl(sport) {
   return `${ESPN_BASE}/${sport.newsPath}/news`;
 }
 
+function hashText(text) {
+  let hash = 0;
+  const source = String(text || "");
+  for (let index = 0; index < source.length; index += 1) {
+    hash = ((hash << 5) - hash + source.charCodeAt(index)) | 0;
+  }
+  return `${source.length}-${Math.abs(hash)}`;
+}
+
+function splitTextForTranslation(text, maxLength = 440) {
+  const source = String(text || "").replace(/\s+/g, " ").trim();
+  if (!source) return [];
+  const sentences = source.match(/[^.!?]+[.!?]+|\S.+$/g) || [source];
+  const chunks = [];
+  let current = "";
+  sentences.forEach((sentence) => {
+    const next = `${current} ${sentence}`.trim();
+    if (next.length > maxLength && current) {
+      chunks.push(current);
+      current = sentence.trim();
+    } else if (sentence.length > maxLength) {
+      if (current) chunks.push(current);
+      for (let index = 0; index < sentence.length; index += maxLength) {
+        chunks.push(sentence.slice(index, index + maxLength));
+      }
+      current = "";
+    } else {
+      current = next;
+    }
+  });
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+async function translateChunkToFrench(text) {
+  const clean = String(text || "").trim();
+  if (!clean) return "";
+  const cacheKey = `footlive:fr:${hashText(clean)}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) return cached;
+  let translated = "";
+  try {
+    const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=fr&dt=t&q=${encodeURIComponent(clean)}`;
+    const googlePayload = await fetchJson(googleUrl, 14000);
+    translated = (googlePayload?.[0] || []).map((part) => part?.[0] || "").join("");
+  } catch {
+    const fallbackUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean)}&langpair=en|fr`;
+    const fallbackPayload = await fetchJson(fallbackUrl, 14000);
+    translated = fallbackPayload?.responseData?.translatedText || "";
+  }
+  if (!translated) throw new Error("Traduction indisponible");
+  localStorage.setItem(cacheKey, translated);
+  return translated;
+}
+
+async function translateTextToFrench(text) {
+  const chunks = splitTextForTranslation(text);
+  const translated = [];
+  for (const chunk of chunks) {
+    translated.push(await translateChunkToFrench(chunk));
+  }
+  return translated.join(" ");
+}
+
+async function translateNewsTeasers(news) {
+  const translated = [];
+  for (const item of news) {
+    try {
+      translated.push({
+        ...item,
+        title: await translateTextToFrench(item.title),
+        description: await translateTextToFrench(item.description),
+        translated: true,
+      });
+    } catch {
+      translated.push(item);
+    }
+  }
+  return translated;
+}
+
+function useTranslatedNews(news) {
+  const [translated, setTranslated] = useState(news);
+  useEffect(() => {
+    let cancelled = false;
+    setTranslated(news);
+    translateNewsTeasers(news).then((items) => {
+      if (!cancelled) setTranslated(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [news.map((item) => item.id).join("|")]);
+  return translated;
+}
+
 function normalizeTeam(competitor) {
   const team = competitor?.team || {};
   return {
@@ -273,16 +369,36 @@ function normalizeEvent(event, item) {
 function normalizeNews(payload) {
   return (payload?.articles || []).slice(0, 12).map((article, index) => ({
     id: article.dataSourceIdentifier || `${article.headline}-${index}`,
-    title: article.headline || "Actualite",
+    espnId: article.id || "",
+    title: article.headline || "Actualité",
     description: article.description || article.type || "",
-    body: article.story || article.description || "Article ESPN affiche directement dans Foot Live.",
+    body: article.story || article.description || "Article ESPN affiché directement dans Foot Live.",
+    paragraphs: htmlToParagraphs(article.story || article.description || ""),
     image: article.images?.[0]?.url || "",
+    imageCredit: article.images?.[0]?.credit || "",
+    imageAlt: article.images?.[0]?.alt || article.images?.[0]?.caption || "",
+    byline: article.byline || "ESPN",
+    published: article.published || article.lastModified || "",
+    apiUrl: article.links?.api?.self?.href || (article.id ? `https://content.core.api.espn.com/v1/sports/news/${article.id}` : ""),
+    sourceUrl: article.links?.web?.href || "",
   }));
 }
 
-async function fetchJson(url) {
+function htmlToParagraphs(value) {
+  const source = String(value || "").trim();
+  if (!source) return [];
+  const doc = new DOMParser().parseFromString(source, "text/html");
+  doc.querySelectorAll("script, style, photo1, inline1").forEach((node) => node.remove());
+  const paragraphs = [...doc.body.querySelectorAll("p")]
+    .map((node) => node.textContent.replace(/\s+/g, " ").trim())
+    .filter((text) => text && !/^<?(photo|inline)\d*>?$/i.test(text));
+  if (paragraphs.length) return paragraphs;
+  return source.split(/\n{2,}/).map((text) => text.replace(/\s+/g, " ").trim()).filter(Boolean);
+}
+
+async function fetchJson(url, timeoutMs = 9000) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 9000);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -290,6 +406,43 @@ async function fetchJson(url) {
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+async function fetchFullArticle(article) {
+  if (!article?.apiUrl) return article;
+  const payload = await fetchJson(article.apiUrl, 14000);
+  const full = payload?.headlines?.[0] || payload;
+  const story = full.story || article.body || article.description || "";
+  const images = full.images || [];
+  return {
+    ...article,
+    title: full.headline || full.title || article.title,
+    description: full.description || article.description,
+    body: story,
+    paragraphs: htmlToParagraphs(story),
+    image: images[0]?.url || article.image,
+    imageCredit: images[0]?.credit || article.imageCredit,
+    imageAlt: images[0]?.alt || images[0]?.caption || article.imageAlt,
+    byline: full.byline || article.byline,
+    published: full.published || full.lastModified || article.published,
+    sourceUrl: full.links?.web?.href || article.sourceUrl,
+    loadedFull: true,
+  };
+}
+
+async function translateArticle(article) {
+  const paragraphs = article.paragraphs?.length ? article.paragraphs : htmlToParagraphs(article.body || article.description || "");
+  const translatedParagraphs = [];
+  for (const paragraph of paragraphs) {
+    translatedParagraphs.push(await translateTextToFrench(paragraph));
+  }
+  return {
+    ...article,
+    title: await translateTextToFrench(article.title),
+    description: await translateTextToFrench(article.description),
+    paragraphs: translatedParagraphs,
+    translated: true,
+  };
 }
 
 function App() {
@@ -322,7 +475,6 @@ function App() {
     let cancelled = false;
     async function load() {
       setLoadingLabel("Chargement des matches ESPN...");
-      setMatches([]);
       if (!sport.leagues.length) {
         if (!cancelled) {
           setMatches([]);
@@ -566,19 +718,59 @@ function TeamCell({ team, side = "" }) {
 }
 
 function RightPanel({ sport, news, matches, openNews, navigate, selectSearch }) {
+  const shownNews = useTranslatedNews(news);
   const live = matches.filter((match) => match.state === "in").length;
   const finished = matches.filter((match) => match.state === "post").length;
   const scheduled = matches.filter((match) => match.state !== "in" && match.state !== "post").length;
-  return html`<aside className="right-panel"><section className="panel news-panel"><div className="panel-heading-row"><h2>Actualités</h2><button className="panel-link" onClick=${() => navigate("news")}>Tout voir</button></div><div className="news-list">${news.slice(0, 5).map((item) => html`<button className="news-card" onClick=${() => openNews(item)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="team-logo"></div>`}<span><strong>${item.title}</strong><small>${item.description || "Lire dans Foot Live"}</small></span></button>`)}</div></section><section className="panel data-panel"><h2>Infos du jour</h2><div className="data-grid"><div><strong>${matches.length}</strong><span>matchs chargés</span></div><div><strong>${live}</strong><span>live</span></div><div><strong>${finished}</strong><span>terminés</span></div><div><strong>${scheduled}</strong><span>à venir</span></div></div></section><section className="panel"><h2>Top compétitions</h2><div className="stack">${sport.leagues.slice(0, 8).map((item) => html`<button className="top-row" onClick=${() => selectSearch(item.label)}><span className="top-main"><${Flag} code=${item.flag} /><strong>${item.label}</strong></span><span className="count-pill">${countForLeague(matches, item.id)}</span></button>`)}</div></section></aside>`;
+  return html`<aside className="right-panel"><section className="panel news-panel"><div className="panel-heading-row"><h2>Actualités</h2><button className="panel-link" onClick=${() => navigate("news")}>Tout voir</button></div><div className="news-list">${shownNews.slice(0, 5).map((item) => html`<button className="news-card" onClick=${() => openNews(item)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="team-logo"></div>`}<span><strong>${item.title}</strong><small>${item.description || "Lire dans Foot Live"}</small></span></button>`)}</div></section><section className="panel data-panel"><h2>Infos du jour</h2><div className="data-grid"><div><strong>${matches.length}</strong><span>matchs chargés</span></div><div><strong>${live}</strong><span>live</span></div><div><strong>${finished}</strong><span>terminés</span></div><div><strong>${scheduled}</strong><span>à venir</span></div></div></section><section className="panel"><h2>Top compétitions</h2><div className="stack">${sport.leagues.slice(0, 8).map((item) => html`<button className="top-row" onClick=${() => selectSearch(item.label)}><span className="top-main"><${Flag} code=${item.flag} /><strong>${item.label}</strong></span><span className="count-pill">${countForLeague(matches, item.id)}</span></button>`)}</div></section></aside>`;
 }
 
 function NewsPage({ sport, news, navigate }) {
-  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">${sport.label}</p><h1>Actualités sportives</h1><p>Articles consultables directement dans Foot Live, sans ouvrir ESPN dans un onglet externe.</p></section>${news.length ? html`<div className="news-grid">${news.map((item) => html`<button className="article-card" key=${item.id} onClick=${() => navigate("article", item.id)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="article-fallback">FL</div>`}<span><small>${sport.label}</small><strong>${item.title}</strong><p>${item.description || "Lire l'article complet dans le site."}</p></span></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucune actualité ESPN chargée</h2><p>Le site n'affiche pas d'actualité locale inventée.</p></div>`}</main>`;
+  const shownNews = useTranslatedNews(news);
+  return html`<main className="page-shell"><section className="section-header"><p className="eyebrow">${sport.label}</p><h1>Actualités sportives</h1><p>Vraies actualités ESPN, traduites en français et consultables directement dans Foot Live.</p></section>${shownNews.length ? html`<div className="news-grid">${shownNews.map((item) => html`<button className="article-card" key=${item.id} onClick=${() => navigate("article", item.id)}>${item.image ? html`<img src=${item.image} alt="" loading="lazy" />` : html`<div className="article-fallback">FL</div>`}<span><small>${sport.label} / ${item.translated ? "FR" : "ESPN"}</small><strong>${item.title}</strong><p>${item.description || "Lire l'article complet dans le site."}</p></span></button>`)}</div>` : html`<div className="empty-panel"><h2>Aucune actualité ESPN chargée</h2><p>Le site n'affiche pas d'actualité locale inventée.</p></div>`}</main>`;
 }
 
 function ArticlePage({ article, sport, navigate }) {
+  const [detail, setDetail] = useState(article);
+  const [translated, setTranslated] = useState(null);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadArticle() {
+      if (!article) return;
+      setDetail(article);
+      setTranslated(null);
+      setStatus("Chargement de l'article complet ESPN...");
+      let full = article;
+      try {
+        full = await fetchFullArticle(article);
+      } catch {
+        full = article;
+      }
+      if (cancelled) return;
+      setDetail(full);
+      setStatus(full.loadedFull ? "Article ESPN complet chargé. Traduction française en cours..." : "Traduction française de l'actualité ESPN disponible...");
+      try {
+        const fr = await translateArticle(full);
+        if (!cancelled) {
+          setTranslated(fr);
+          setStatus(full.loadedFull ? "Article ESPN complet traduit en français" : "Actualité ESPN traduite en français");
+        }
+      } catch {
+        if (!cancelled) setStatus("Actualité ESPN réelle affichée. Traduction indisponible pour le moment.");
+      }
+    }
+    loadArticle();
+    return () => {
+      cancelled = true;
+    };
+  }, [article?.id]);
+
   if (!article) return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><div className="empty-panel"><h2>Aucun article ESPN chargé</h2><p>Le site n'affiche pas de faux article local.</p></div></main>`;
-  return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualité</p><h1>${article.title}</h1>${article.image && html`<img className="article-hero" src=${article.image} alt="" />`}<p className="article-lead">${article.description || ""}</p><p>${article.body || article.description || "Article affiché directement dans Foot Live."}</p></article></main>`;
+  const shown = translated || detail || article;
+  const paragraphs = shown.paragraphs?.length ? shown.paragraphs : htmlToParagraphs(shown.body || shown.description || "");
+  return html`<main className="page-shell article-layout"><button className="liquid-button ghost back-button" onClick=${() => navigate("news")}>Retour aux actualités</button><article className="article-page"><p className="eyebrow">${sport.label} / Actualité ESPN réelle</p><h1>${shown.title}</h1><div className="article-meta"><span>${shown.byline || "ESPN"}</span><span>${formatNewsDate(shown.published)}</span><strong>${shown.translated ? "Français" : "Source ESPN"}</strong></div>${shown.image && html`<figure className="article-figure"><img className="article-hero" src=${shown.image} alt=${shown.imageAlt || ""} /><figcaption>${shown.imageCredit || shown.imageAlt || ""}</figcaption></figure>`}<p className="article-lead">${shown.description || ""}</p><div className="article-status">${status}</div><div className="article-body">${paragraphs.map((paragraph) => html`<p>${paragraph}</p>`)}</div></article></main>`;
 }
 
 function FavoritesPage({ favorites, navigate, openMatch }) {
@@ -704,17 +896,17 @@ function MatchPage({ match, navigate }) {
     let cancelled = false;
     async function loadSummary() {
       if (!match) return;
-          setLoading("Chargement du résumé ESPN...");
+      setLoading("");
       try {
         const payload = await fetchJson(summaryUrl(match));
         if (!cancelled) {
           setSummary(payload);
-          setLoading("Résumé ESPN chargé en temps réel");
+          setLoading("");
         }
       } catch {
         if (!cancelled) {
           setSummary(null);
-          setLoading("Résumé ESPN indisponible pour ce match");
+          setLoading("");
         }
       }
     }
@@ -765,7 +957,7 @@ function MatchPage({ match, navigate }) {
       <section className="match-hero">
         <button className="star-btn" type="button">☆</button>
         <div className="match-team-card"><${TeamBadge} team=${match.home} /><strong>${match.home.name}</strong><span>${match.home.code || ""}</span></div>
-        <div className="match-score-card"><span>${formatMatchDate(match.date)}</span><strong>${homeScore} - ${awayScore}</strong><small>${status}</small><p>${loading}</p></div>
+        <div className="match-score-card"><span>${formatMatchDate(match.date)}</span><strong>${homeScore} - ${awayScore}</strong><small>${status}</small></div>
         <div className="match-team-card"><${TeamBadge} team=${match.away} /><strong>${match.away.name}</strong><span>${match.away.code || ""}</span></div>
         <button className="star-btn" type="button">☆</button>
       </section>
@@ -792,6 +984,11 @@ function TeamBadge({ team }) {
 function formatMatchDate(date) {
   if (!date) return "";
   return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(`${date}T12:00:00`));
+}
+
+function formatNewsDate(date) {
+  if (!date) return "Date ESPN indisponible";
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(date));
 }
 
 function formatOdds(teamOdds) {

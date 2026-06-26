@@ -909,18 +909,71 @@ h1 {
   line-height: 1;
 }
 
+.article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.article-meta span,
+.article-meta strong,
+.article-status {
+  min-height: 28px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: #eef2f4;
+}
+
+.article-meta strong {
+  color: #ffffff;
+  background: var(--green-dark);
+}
+
+.article-figure {
+  margin: 18px 0;
+}
+
 .article-hero {
   width: 100%;
   max-height: 420px;
-  margin: 18px 0;
   border-radius: 8px;
   object-fit: cover;
+}
+
+.article-figure figcaption {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .article-lead {
   color: var(--muted);
   font-size: 18px;
   line-height: 1.55;
+}
+
+.article-status {
+  width: fit-content;
+  margin: 12px 0;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.article-body {
+  display: grid;
+  gap: 14px;
+}
+
+.article-body p {
+  margin: 0;
+  color: #10242c;
+  font-size: 16px;
+  line-height: 1.75;
 }
 
 .back-button {
